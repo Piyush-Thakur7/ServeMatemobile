@@ -26,18 +26,23 @@ router.get('/profile', authenticate, async (req, res) => {
   }
 });
 
-// Make a Donation
+// Make a Donation (Updated for Token Economy)
 router.post('/donate', authenticate, async (req, res) => {
   try {
     const { amount, cause, ngoId } = req.body;
+    const user = await User.findById(req.userId);
+
+    if (!user || user.tokens < amount) {
+      return res.status(400).json({ error: 'Insufficient tokens. Please acquire more tokens!' });
+    }
+
     const donation = new Donation({ userId: req.userId, amount, cause, ngoId });
     await donation.save();
 
-    // Update User XP and Total Donated
-    const xpEarned = 10; // Base XP per donation
-    const user = await User.findById(req.userId);
+    // Deduct Tokens and Add XP
+    user.tokens -= amount;
     user.totalDonated += amount;
-    user.xp += xpEarned;
+    user.xp += 10;
 
     // Level calculation logic
     if (user.xp >= 5000) user.level = 'Legend';
@@ -48,7 +53,20 @@ router.post('/donate', authenticate, async (req, res) => {
     else user.level = 'Beginner';
 
     await user.save();
-    res.json({ message: 'Donation recorded successfully', xpEarned });
+    res.json({ message: 'Donation successful!', currentTokens: user.tokens, xpEarned: 10 });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Simulate Token Purchase (For Prototype)
+router.post('/buy-tokens', authenticate, async (req, res) => {
+  try {
+    const { amount } = req.body;
+    const user = await User.findById(req.userId);
+    user.tokens += amount;
+    await user.save();
+    res.json({ message: `Tokens added! Current balance: ${user.tokens}`, tokens: user.tokens });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

@@ -6,9 +6,11 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   city: { type: String },
   xp: { type: Number, default: 0 },
+  tokens: { type: Number, default: 100 }, // New: Token balance for prototype
   totalDonated: { type: Number, default: 0 },
   level: { type: String, default: 'Beginner' },
   badges: [String],
+  role: { type: String, enum: ['user', 'admin'], default: 'user' }, // New: Role for Admin Panel
   joinedAt: { type: Date, default: Date.now }
 });
 
