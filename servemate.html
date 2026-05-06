@@ -489,10 +489,20 @@
   .comp-item { display: flex; align-items: flex-start; gap: .6rem; margin-bottom: .75rem; font-size: .88rem; line-height: 1.5; }
   .comp-item:last-child { margin-bottom: 0; }
 
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 6px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  /* AI-Enhanced Visuals */
+  .hero-img {
+    width: 100%; max-width: 600px; border-radius: var(--radius);
+    box-shadow: var(--shadow-lg); margin: 2rem auto; display: block;
+  }
+  .cause-img {
+    width: 100%; height: 160px; object-fit: cover; border-radius: 12px; margin-bottom: 1rem;
+  }
+  .loading-overlay {
+    position: fixed; inset: 0; background: rgba(255,255,255,0.8);
+    display: flex; align-items: center; justify-content: center; z-index: 9999;
+    font-family: 'Sora', sans-serif; font-weight: 700; color: var(--blue);
+  }
+  [data-theme="dark"] .loading-overlay { background: rgba(10,15,30,0.8); }
 
   /* Clickable name buttons */
   .lb-name-btn {
@@ -2039,53 +2049,51 @@ const NGO_PROFILES = {
   }
 };
 
-function openUserProfile(id) {
-  const u = USER_PROFILES[id];
-  if (!u) return;
-  document.getElementById('upm-avatar').textContent = u.initials;
-  document.getElementById('upm-avatar').style.background = u.gradient;
-  document.getElementById('upm-name').textContent = u.name;
-  document.getElementById('upm-sub').textContent = '📍 ' + u.city + '   |   Member since ' + u.since + '   |   ⭐ ' + u.level;
-  document.getElementById('upm-stats').innerHTML = u.stats.map(s =>
-    `<div class="pm-stat"><div class="n">${s.n}</div><div class="l">${s.l}</div></div>`
-  ).join('');
-  document.getElementById('upm-badges').innerHTML = u.badges.map(b =>
-    `<span class="badge badge-blue" style="font-size:.78rem;">${b}</span>`
-  ).join('');
-  document.getElementById('upm-history').innerHTML = u.history.map(h =>
-    `<div class="pm-hist-item"><span class="pm-hist-icon">${h.icon}</span><div class="pm-hist-body"><div style="font-weight:600;">${h.title}</div><div style="font-size:.75rem;color:var(--text3);">${h.date}</div></div><span class="pm-hist-amt">${h.amt}</span></div>`
-  ).join('');
-  openModal('user-profile-modal');
+async function openUserProfile(id) {
+  try {
+    const u = await BackendService.request(`/profile/${id}`); // Note: Backend needs this endpoint
+    document.getElementById('upm-avatar').textContent = u.name.charAt(0).toUpperCase();
+    document.getElementById('upm-avatar').style.background = 'linear-gradient(135deg,var(--blue),var(--orange))';
+    document.getElementById('upm-name').textContent = u.name;
+    document.getElementById('upm-sub').textContent = '📍 ' + (u.city || 'Unknown') + '   |   Member since 2024   |   ⭐ ' + u.level;
+    document.getElementById('upm-stats').innerHTML = [
+      {n: `₹${u.totalDonated}`, l: 'Total Donated'},
+      {n: u.xp, l: 'XP Points'},
+      {n: 'N/A', l: 'Donations'},
+      {n: 'N/A', l: 'Rank'}
+    ].map(s => `<div class="pm-stat"><div class="n">${s.n}</div><div class="l">${s.l}</div></div>`).join('');
+    document.getElementById('upm-badges').innerHTML = (u.badges || []).map(b => `<span class="badge badge-blue" style="font-size:.78rem;">${b}</span>`).join('');
+    openModal('user-profile-modal');
+  } catch (err) {
+    showToast('❌ Error loading profile');
+  }
 }
 
-function openNGOProfile(id) {
-  const n = NGO_PROFILES[id];
-  if (!n) return;
-  document.getElementById('npm-icon').textContent = n.icon;
-  document.getElementById('npm-name').textContent = n.name + ' ✓';
-  document.getElementById('npm-location').textContent = n.location;
-  document.getElementById('npm-rating').innerHTML = `<span style="color:var(--orange);font-size:.85rem;">${n.rating}</span>`;
-  document.getElementById('npm-stats').innerHTML = n.stats.map(s =>
-    `<div class="pm-stat"><div class="n">${s.n}</div><div class="l">${s.l}</div></div>`
-  ).join('');
-  document.getElementById('npm-motive').textContent = n.motive;
-  document.getElementById('npm-badges').innerHTML = n.badges.map(b =>
-    `<span class="badge badge-green" style="font-size:.78rem;">${b}</span>`
-  ).join('');
-  document.getElementById('npm-vol-count').textContent = n.volunteers.length;
-  document.getElementById('npm-volunteers').innerHTML = n.volunteers.map(v =>
-    `<div class="volunteer-chip"><div class="vc-avatar">${v.initials}</div>${v.name}</div>`
-  ).join('');
-  document.getElementById('npm-videos').innerHTML = n.videos.map(v =>
-    `<div class="video-proof-card">
-      <div class="vpc-thumb" onclick="showToast('▶ Playing: ${v.title}')">▶️</div>
-      <div class="vpc-body">
-        <div class="vpc-title">${v.icon} ${v.title}</div>
-        <div class="vpc-meta">📅 ${v.date} &nbsp;|&nbsp; ⏱ ${v.duration} &nbsp;|&nbsp; <span class="badge badge-green" style="font-size:.7rem;">✅ Verified</span></div>
+async function openNGOProfile(id) {
+  try {
+    const n = await BackendService.getNGO(id);
+    document.getElementById('npm-icon').textContent = '🏢';
+    document.getElementById('npm-name').textContent = n.name + ' ✓';
+    document.getElementById('npm-location').textContent = n.location;
+    document.getElementById('npm-rating').innerHTML = `<span style="color:var(--orange);font-size:.85rem;">★★★★★ ${n.rating || '5.0'}</span>`;
+    document.getElementById('npm-stats').innerHTML = n.stats ? n.stats.map(s => `<div class="pm-stat"><div class="n">${s.n}</div><div class="l">${s.l}</div></div>`).join('') : '';
+    document.getElementById('npm-motive').textContent = n.motive;
+    document.getElementById('npm-badges').innerHTML = (n.badges || []).map(b => `<span class="badge badge-green" style="font-size:.78rem;">${b}</span>`).join('');
+    document.getElementById('npm-vol-count').textContent = n.volunteers?.length || 0;
+    document.getElementById('npm-volunteers').innerHTML = (n.volunteers || []).map(v => `<div class="volunteer-chip"><div class="vc-avatar">${v.initials}</div>${v.name}</div>`).join('');
+    document.getElementById('npm-videos').innerHTML = (n.videos || []).map(v => `
+      <div class="video-proof-card">
+        <div class="vpc-thumb" onclick="showToast('▶ Playing: ${v.title}')">▶️</div>
+        <div class="vpc-body">
+          <div class="vpc-title">${v.icon} ${v.title}</div>
+          <div class="vpc-meta">📅 ${v.date} &nbsp;|&nbsp; ⏱ ${v.duration} &nbsp;|&nbsp; <span class="badge badge-green" style="font-size:.7rem;">✅ Verified</span></div>
+        </div>
       </div>
-    </div>`
-  ).join('');
-  openModal('ngo-profile-modal');
+    `).join('');
+    openModal('ngo-profile-modal');
+  } catch (err) {
+    showToast('❌ Error loading NGO profile');
+  }
 }
 
 // Close profile modals on overlay click
