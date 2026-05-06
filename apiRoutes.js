@@ -59,16 +59,29 @@ router.post('/donate', authenticate, async (req, res) => {
   }
 });
 
-// Simulate Token Purchase (For Prototype)
-router.post('/buy-tokens', authenticate, async (req, res) => {
+// Request Tokens (Simulated payment via UPI screenshot)
+router.post('/request-tokens', authenticate, async (req, res) => {
   try {
-    const { amount } = req.body;
-    const user = await User.findById(req.userId);
-    user.tokens += amount;
-    await user.save();
-    res.json({ message: `Tokens added! Current balance: ${user.tokens}`, tokens: user.tokens });
+    const { amount, screenshotUrl } = req.body;
+    const request = new TokenRequest({
+      userId: req.userId,
+      amountRequested: amount,
+      screenshotUrl: screenshotUrl
+    });
+    await request.save();
+    res.json({ message: 'Token request submitted! Admin will verify your payment.' });
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+// Get User Token Status
+router.get('/token-status', authenticate, async (req, res) => {
+  try {
+    const requests = await TokenRequest.find({ userId: req.userId }).sort({ createdAt: -1 });
+    res.json(requests);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

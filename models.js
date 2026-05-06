@@ -47,9 +47,19 @@ const taskSchema = new mongoose.Schema({
   isVerified: { type: Boolean, default: false }
 });
 
+const tokenRequestSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  amountRequested: { type: Number, required: true },
+  screenshotUrl: { type: String, required: true },
+  status: { type: String, enum: ['Pending', 'Approved', 'Rejected'], default: 'Pending' },
+  createdAt: { type: Date, default: Date.now },
+  processedAt: { type: Date }
+});
+
 module.exports = {
   User: mongoose.model('User', userSchema),
   NGO: mongoose.model('NGO', ngoSchema),
   Donation: mongoose.model('Donation', donationSchema),
-  Task: mongoose.model('Task', taskSchema)
+  Task: mongoose.model('Task', taskSchema),
+  TokenRequest: mongoose.model('TokenRequest', tokenRequestSchema)
 };
