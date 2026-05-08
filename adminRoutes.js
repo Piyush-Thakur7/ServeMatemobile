@@ -1,12 +1,11 @@
 const express  = require("express");
-const jwt      = require("jsonwebtoken");
 const { User, NGO, Cause, Donation, Transparency, Contact } = require("./models");
+const { adminOnly } = require("./authUtils");
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || "servemate_secret";
 
 // ─── ADMIN AUTH MIDDLEWARE ────────────────────────────────────────────────────
-const adminOnly = (req, res, next) => {
+const legacyAdminOnly = (req, res, next) => {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith("Bearer "))
     return res.status(401).json({ error: "No token" });

@@ -5,7 +5,7 @@
  */
 
 const API = (() => {
-  const BASE = "https://resence.in/api";   // ← your domain
+  const BASE = window.SERVEMATE_API_BASE_URL || "https://servemate.onrender.com/api";
 
   // ── Token storage ──────────────────────────────────────────────────────────
   const getToken  = ()     => localStorage.getItem("sm_token");
@@ -510,4 +510,4 @@ window.handleContact = async function() {
 
 // Expose API globally so console debugging works
 window.API = API;
-console.log("🚀 ServeMate API loaded. Backend: https://resence.in/api");
+console.log("ServeMate API loaded. Backend:", window.SERVEMATE_API_BASE_URL || "https://servemate.onrender.com/api");

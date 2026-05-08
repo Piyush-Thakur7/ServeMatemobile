@@ -1,4 +1,5 @@
 const express  = require("express");
+const mongoose = require("mongoose");
 const { User, NGO, Cause, Donation, Transparency, Contact } = require("./models");
 const { authMiddleware } = require("./authRoutes");
 
@@ -39,12 +40,15 @@ router.get("/causes/:id", async (req, res) => {
 // POST /api/donate  — authenticated user donates to a cause
 router.post("/donate", authMiddleware, async (req, res) => {
   try {
-    const { causeId, amount } = req.body;
-    if (!causeId || !amount || amount < 10)
+    const { causeId, cause, amount } = req.body;
+    const causeRef = causeId || cause;
+    if (!causeRef || !amount || amount < 10)
       return res.status(400).json({ error: "Cause and minimum ₹10 required" });
 
-    const cause = await Cause.findById(causeId);
-    if (!cause || !cause.active)
+    const causeDoc = mongoose.Types.ObjectId.isValid(causeRef)
+      ? await Cause.findById(causeRef)
+      : await Cause.findOne({ category: causeRef, active: true }).sort({ raised: -1 });
+    if (!causeDoc || !causeDoc.active)
       return res.status(404).json({ error: "Cause not found or inactive" });
 
     // XP earned = 1 XP per ₹1 donated (min 10)
@@ -53,16 +57,16 @@ router.post("/donate", authMiddleware, async (req, res) => {
     // Create donation record
     const donation = await Donation.create({
       user:   req.user.id,
-      cause:  causeId,
-      ngo:    cause.assignedNgo,
+      cause:  causeDoc._id,
+      ngo:    causeDoc.assignedNgo,
       amount: Number(amount),
       xpEarned,
       status: "pending",
-      location: cause.location || ""
+      location: causeDoc.location || ""
     });
 
     // Update cause stats
-    await Cause.findByIdAndUpdate(causeId, {
+    await Cause.findByIdAndUpdate(causeDoc._id, {
       $inc: { raised: amount, contributors: 1 }
     });
 
@@ -86,8 +90,8 @@ router.post("/donate", authMiddleware, async (req, res) => {
     await user.save();
 
     // If NGO assigned, update received amount
-    if (cause.assignedNgo) {
-      await NGO.findByIdAndUpdate(cause.assignedNgo, {
+    if (causeDoc.assignedNgo) {
+      await NGO.findByIdAndUpdate(causeDoc.assignedNgo, {
         $inc: { totalReceived: amount }
       });
     }
