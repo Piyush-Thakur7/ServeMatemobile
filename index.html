@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8">
@@ -777,18 +777,18 @@
 
   <!-- Hero -->
   <div class="hero">
-    <div class="hero-eyebrow">🇮🇳 Trusted by 12,400+ Contributors Across India</div>
+    <div class="hero-eyebrow">Live MVP connected to MongoDB-backed workflows</div>
     <h1>Small Contributions.<br><span class="grad">Real Impact.</span></h1>
-    <p>Track exactly where your money goes — from your wallet to verified NGOs to proof of work.</p>
+    <p>Use virtual support tokens, follow real platform activity, and see only admin-approved NGO records.</p>
     <div class="hero-btns">
       <button class="btn btn-primary btn-lg" onclick="openDonateModal()">🤝 Start Contributing</button>
       <button class="btn btn-outline btn-lg" onclick="showPage('about')">How It Works</button>
     </div>
     <div class="hero-stats">
-      <div class="hero-stat"><div class="num">₹48L+</div><div class="lbl">Donated</div></div>
-      <div class="hero-stat"><div class="num">3,200+</div><div class="lbl">Tasks Verified</div></div>
-      <div class="hero-stat"><div class="num">47</div><div class="lbl">Active NGOs</div></div>
-      <div class="hero-stat"><div class="num">12,400+</div><div class="lbl">Contributors</div></div>
+      <div class="hero-stat"><div class="num" data-stat="donated">0 tokens</div><div class="lbl">Tokens Purchased</div></div>
+      <div class="hero-stat"><div class="num" data-stat="lives">0 impact</div><div class="lbl">Impact Score</div></div>
+      <div class="hero-stat"><div class="num" data-stat="ngos">0 NGOs</div><div class="lbl">Approved NGOs</div></div>
+      <div class="hero-stat"><div class="num" data-stat="users">0</div><div class="lbl">Registered Users</div></div>
     </div>
   </div>
 
@@ -797,50 +797,8 @@
     <div class="container">
       <div class="section-label">🌱 Active Causes</div>
       <h2 class="section-title">Choose Your Impact</h2>
-      <p class="section-sub" style="margin-bottom:2.5rem;">Every rupee goes to a specific verified cause. Watch it come to life.</p>
-      <div class="grid-3">
-        <div class="card cause-card">
-          <div class="cause-icon">🍱</div>
-          <h3 style="font-size:1.15rem;font-weight:700;margin-bottom:.35rem;">Feed the Hungry</h3>
-          <p style="font-size:.85rem;color:var(--text2);margin-bottom:1rem;line-height:1.6;">₹10 = 1 nutritious meal for a child in need. Partner NGOs distribute daily.</p>
-          <div class="cause-meta">
-            <span>Progress</span><span class="cause-raised">₹1,24,500</span>
-          </div>
-          <div class="progress-track"><div class="progress-fill" style="width:83%"></div></div>
-          <div class="cause-footer">
-            <span style="font-size:.8rem;color:var(--text2);">👥 2,481 contributors</span>
-            <button class="btn btn-primary" onclick="openDonateModal('meals')">Donate</button>
-          </div>
-        </div>
-        <div class="card cause-card">
-          <div class="cause-icon">🌳</div>
-          <h3 style="font-size:1.15rem;font-weight:700;margin-bottom:.35rem;">Plant Trees</h3>
-          <p style="font-size:.85rem;color:var(--text2);margin-bottom:1rem;line-height:1.6;">₹50 = 1 sapling planted & tracked with GPS. Monthly survival proof shared.</p>
-          <div class="cause-meta">
-            <span>Progress</span><span class="cause-raised">₹86,200</span>
-          </div>
-          <div class="progress-track"><div class="progress-fill" style="width:57%"></div></div>
-          <div class="cause-footer">
-            <span style="font-size:.8rem;color:var(--text2);">👥 1,724 contributors</span>
-            <button class="btn btn-primary" onclick="openDonateModal('trees')">Donate</button>
-          </div>
-        </div>
-        <div class="card cause-card">
-          <div class="cause-icon">🧺</div>
-          <h3 style="font-size:1.15rem;font-weight:700;margin-bottom:.35rem;">Essential Supplies</h3>
-          <p style="font-size:.85rem;color:var(--text2);margin-bottom:1rem;line-height:1.6;">₹100 = hygiene kit for a family. Distribution recorded with photo & video proof.</p>
-          <div class="cause-meta">
-            <span>Progress</span><span class="cause-raised">₹2,03,800</span>
-          </div>
-          <div class="progress-track"><div class="progress-fill" style="width:68%"></div></div>
-          <div class="cause-footer">
-            <span style="font-size:.8rem;color:var(--text2);">👥 3,812 contributors</span>
-            <button class="btn btn-primary" onclick="openDonateModal('essentials')">Donate</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
+      <p class="section-sub" style="margin-bottom:2.5rem;">Causes are managed by admins and show live token activity from MongoDB.</p>
+      <div class="grid-3" id="causes-grid"><div class="card cause-card"><h3 style="font-size:1.15rem;font-weight:700;margin-bottom:.35rem;">No active causes yet</h3><p style="font-size:.85rem;color:var(--text2);margin-bottom:1rem;line-height:1.6;">Admin-created causes will appear here without hardcoded totals.</p></div></div></div></section>
 
   <!-- How It Works Mini -->
   <section style="background:var(--bg2);">
@@ -852,8 +810,8 @@
         <div class="step">
           <div class="step-num">1</div>
           <div class="step-arrow">→</div>
-          <h4 style="font-weight:700;margin-bottom:.4rem;">You Donate</h4>
-          <p style="font-size:.82rem;color:var(--text2);line-height:1.5;">Choose a cause, pick an amount, make an impact.</p>
+          <h4 style="font-weight:700;margin-bottom:.4rem;">Use Tokens</h4>
+          <p style="font-size:.82rem;color:var(--text2);line-height:1.5;">Choose a cause and spend virtual support tokens.</p>
         </div>
         <div class="step">
           <div class="step-num" style="background:var(--orange)">2</div>
@@ -887,7 +845,7 @@
   <div class="what-hero">
     <div class="trust-pill">🔍 Built for Transparency</div>
     <h1 class="section-title">What is ServeMate?</h1>
-    <p>A micro-donation platform that bridges the trust gap between givers and doers — with proof at every step.</p>
+    <p>A gamified virtual support-token platform that bridges the trust gap between givers and doers — with proof at every step.</p>
   </div>
 
   <section>
@@ -895,34 +853,34 @@
       <div class="grid-2" style="margin-bottom:3rem;">
         <div class="problem-card">
           <h3 style="font-weight:700;margin-bottom:1rem;color:#dc2626;">❌ The Problem Today</h3>
-          <div class="comp-item">❌ <span>You donate and hope for the best</span></div>
+          <div class="comp-item">❌ <span>Use Tokens and hope for the best</span></div>
           <div class="comp-item">❌ <span>No visibility into fund usage</span></div>
           <div class="comp-item">❌ <span>Random volunteers, no accountability</span></div>
           <div class="comp-item">❌ <span>No feedback loop from NGO to donor</span></div>
-          <div class="comp-item">❌ <span>Trust erodes, donations decline</span></div>
+          <div class="comp-item">❌ <span>Trust erodes, support activity declines</span></div>
         </div>
         <div class="solution-card">
           <h3 style="font-weight:700;margin-bottom:1rem;color:var(--blue);">✅ How ServeMate Fixes It</h3>
           <div class="comp-item" style="color:var(--blue);">✅ <span>Real-time task tracking</span></div>
-          <div class="comp-item" style="color:var(--blue);">✅ <span>Video + photo + GPS proof</span></div>
-          <div class="comp-item" style="color:var(--blue);">✅ <span>Verified NGOs with own volunteers only</span></div>
+          <div class="comp-item" style="color:var(--blue);">✅ <span>Admin-reviewed proof publishing</span></div>
+          <div class="comp-item" style="color:var(--blue);">✅ <span>Approved NGOs with moderation controls</span></div>
           <div class="comp-item" style="color:var(--blue);">✅ <span>Gamification keeps you engaged</span></div>
           <div class="comp-item" style="color:var(--blue);">✅ <span>Rate & review every work done</span></div>
         </div>
       </div>
 
       <div class="section-label">🔄 The Flow</div>
-      <h2 class="section-title" style="margin-bottom:1rem;">How Your Money Moves</h2>
+      <h2 class="section-title" style="margin-bottom:1rem;">How Support Tokens Move</h2>
       <div class="about-flow">
         <div class="about-step">
           <span class="as-icon">💸</span>
-          <h4>You Donate</h4>
-          <p>Choose a micro-cause. ₹10 to ₹1000. Every rupee tracked.</p>
+          <h4>Use Tokens</h4>
+          <p>Choose a micro-cause. 10 to 1000 virtual support tokens. Every token action is tracked.</p>
         </div>
         <div class="about-step">
           <span class="as-icon">🏢</span>
           <h4>NGO Assigned</h4>
-          <p>Platform assigns to nearest verified NGO with capacity.</p>
+          <p>Platform assigns only after an NGO has been approved and has capacity.</p>
         </div>
         <div class="about-step">
           <span class="as-icon">👷</span>
@@ -977,497 +935,125 @@
   <div class="dash-layout">
     <div class="dash-sidebar">
       <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;">
-        <div class="user-avatar">PS</div>
+        <div class="user-avatar">SM</div>
         <div>
-          <div style="font-weight:700;font-size:.95rem;">Piyush Singh</div>
-          <div class="badge badge-orange" style="margin-top:.2rem;">⭐ Impact Creator</div>
+          <div style="font-weight:700;font-size:.95rem;" data-user-name>Member</div>
+          <div class="badge badge-orange" style="margin-top:.2rem;" data-user-title>Beginner</div>
         </div>
       </div>
       <div class="level-bar">
         <div class="level-info">
-          <span class="level-name">🔥 Level 4 — Impact Creator</span>
-          <span class="xp-count">1,840 / 2,500 XP</span>
+          <span class="level-name" data-user-level>Level 1 - Beginner</span>
+          <span class="xp-count" data-user-xp>0 XP</span>
         </div>
-        <div class="progress-track"><div class="progress-fill" style="width:73%"></div></div>
-        <div style="font-size:.75rem;color:var(--text3);margin-top:.4rem;">660 XP to next level</div>
+        <div class="progress-track"><div class="progress-fill" data-user-progress style="width:0%"></div></div>
+        <div style="font-size:.75rem;color:var(--text3);margin-top:.4rem;" data-user-next>Activity from MongoDB will appear after login.</div>
       </div>
       <ul class="sidebar-nav" style="margin-top:1rem;">
-        <li><button onclick="showDashTab('overview')" class="active" id="stab-overview">📊 Overview</button></li>
-        <li><button onclick="showDashTab('history')" id="stab-history">📋 Donation History</button></li>
-        <li><button onclick="showDashTab('badges')" id="stab-badges">🏅 Badges & XP</button></li>
-        <li><button onclick="showDashTab('gamification')" id="stab-gamification">🎮 Progression</button></li>
+        <li><button onclick="showDashTab('overview')" class="active" id="stab-overview">Overview</button></li>
+        <li><button onclick="showDashTab('history')" id="stab-history">Token Activity</button></li>
+        <li><button onclick="showDashTab('badges')" id="stab-badges">Badges & XP</button></li>
+        <li><button onclick="showDashTab('gamification')" id="stab-gamification">Progression</button></li>
       </ul>
-      <div style="margin-top:auto;padding-top:1rem;border-top:1px solid var(--border);font-size:.8rem;color:var(--text3);">
-        Member since Jan 2026
+      <div style="margin-top:auto;padding-top:1rem;border-top:1px solid var(--border);font-size:.8rem;color:var(--text3);" data-user-created>
+        Login required
       </div>
     </div>
 
     <div class="dash-content">
-      <!-- OVERVIEW TAB -->
       <div id="dtab-overview">
-        <h2 style="font-size:1.4rem;font-weight:800;margin-bottom:1.25rem;">Good morning, Piyush 👋</h2>
+        <h2 style="font-size:1.4rem;font-weight:800;margin-bottom:1.25rem;" data-dashboard-heading>Your Dashboard</h2>
         <div class="stat-cards">
-          <div class="stat-card">
-            <div class="label">Total Donated</div>
-            <div class="value">₹4,850</div>
-            <div class="change">↑ +₹500 this month</div>
-          </div>
-          <div class="stat-card">
-            <div class="label">XP Points</div>
-            <div class="value">1,840</div>
-            <div class="change">↑ +120 this week</div>
-          </div>
-          <div class="stat-card">
-            <div class="label">Tasks Verified</div>
-            <div class="value">38</div>
-            <div class="change">↑ 3 new to review</div>
-          </div>
-          <div class="stat-card">
-            <div class="label">Impact Score</div>
-            <div class="value">94/100</div>
-            <div class="change">🏅 Top 5% donor</div>
-          </div>
+          <div class="stat-card"><div class="label">Token Balance</div><div class="value" data-token-balance>0</div><div class="change">Stored in MongoDB</div></div>
+          <div class="stat-card"><div class="label">XP Points</div><div class="value" data-xp-total>0</div><div class="change">Earned from real actions</div></div>
+          <div class="stat-card"><div class="label">Leaderboard Rank</div><div class="value" data-user-rank>-</div><div class="change">Calculated from live records</div></div>
+          <div class="stat-card"><div class="label">Impact Score</div><div class="value" data-impact-score>0</div><div class="change">Loaded from live records</div></div>
         </div>
-
         <div class="grid-2">
-          <div class="card">
-            <h4 style="font-weight:700;margin-bottom:1rem;">🎯 Recent Activity</h4>
-            <div style="display:flex;flex-direction:column;gap:.75rem;">
-              <div style="display:flex;align-items:center;gap:.75rem;font-size:.88rem;">
-                <div style="width:36px;height:36px;border-radius:50%;background:var(--blue-light);display:flex;align-items:center;justify-content:center;flex-shrink:0;">🍱</div>
-                <div><div style="font-weight:600;">Donated ₹100 to Feed the Hungry</div><div style="color:var(--text3);font-size:.8rem;">2 hours ago</div></div>
-              </div>
-              <div style="display:flex;align-items:center;gap:.75rem;font-size:.88rem;">
-                <div style="width:36px;height:36px;border-radius:50%;background:var(--orange-light);display:flex;align-items:center;justify-content:center;flex-shrink:0;">✅</div>
-                <div><div style="font-weight:600;">Verified tree planting in Lucknow</div><div style="color:var(--text3);font-size:.8rem;">Yesterday</div></div>
-              </div>
-              <div style="display:flex;align-items:center;gap:.75rem;font-size:.88rem;">
-                <div style="width:36px;height:36px;border-radius:50%;background:#dcfce7;display:flex;align-items:center;justify-content:center;flex-shrink:0;">🏅</div>
-                <div><div style="font-weight:600;">Earned "Consistent Contributor" badge</div><div style="color:var(--text3);font-size:.8rem;">3 days ago</div></div>
-              </div>
-            </div>
-          </div>
-          <div class="card">
-            <h4 style="font-weight:700;margin-bottom:1rem;">🍕 Impact Summary</h4>
-            <div style="display:flex;flex-direction:column;gap:.85rem;">
-              <div><div style="display:flex;justify-content:space-between;font-size:.85rem;margin-bottom:.4rem;"><span>🍱 Meals Provided</span><span style="font-weight:700;">485</span></div><div class="progress-track"><div class="progress-fill" style="width:80%"></div></div></div>
-              <div><div style="display:flex;justify-content:space-between;font-size:.85rem;margin-bottom:.4rem;"><span>🌳 Trees Planted</span><span style="font-weight:700;">24</span></div><div class="progress-track"><div class="progress-fill" style="width:48%"></div></div></div>
-              <div><div style="display:flex;justify-content:space-between;font-size:.85rem;margin-bottom:.4rem;"><span>🧺 Kits Distributed</span><span style="font-weight:700;">12</span></div><div class="progress-track"><div class="progress-fill" style="width:60%"></div></div></div>
-            </div>
-          </div>
+          <div class="card"><h4 style="font-weight:700;margin-bottom:1rem;">Recent Activity</h4><div id="recent-activity"><p style="color:var(--text2);font-size:.9rem;">Real activity will appear here after token purchases or contributions.</p></div></div>
+          <div class="card"><h4 style="font-weight:700;margin-bottom:1rem;">Impact Summary</h4><div id="impact-summary"><p style="color:var(--text2);font-size:.9rem;">Impact stats are loaded from MongoDB.</p></div></div>
         </div>
       </div>
 
-      <!-- HISTORY TAB -->
       <div id="dtab-history" style="display:none;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
-          <h2 style="font-size:1.4rem;font-weight:800;">Donation History</h2>
-          <button class="btn btn-primary" onclick="openDonateModal()">+ New Donation</button>
+          <h2 style="font-size:1.4rem;font-weight:800;">Token Activity</h2>
+          <button class="btn btn-primary" onclick="openDonateModal()">+ New Token Action</button>
         </div>
         <div class="card" style="padding:0;overflow:auto;">
           <table class="history-table">
-            <thead>
-              <tr>
-                <th>Cause</th>
-                <th>Amount</th>
-                <th>Date</th>
-                <th>NGO</th>
-                <th>Location</th>
-                <th>Proof</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><div style="font-weight:600;">🍱 Feed the Hungry</div></td>
-                <td style="font-family:'Sora',sans-serif;font-weight:700;">₹100</td>
-                <td style="color:var(--text2);">May 1, 2026</td>
-                <td><span class="ngo-badge">🏢 Sewa Foundation <span class="verified-tick">✓</span></span></td>
-                <td style="color:var(--text2);font-size:.82rem;">Lucknow, UP</td>
-                <td><a href="#" class="proof-btn" onclick="openProofModal()">▶ Watch</a></td>
-                <td><span class="badge badge-green">✅ Verified</span></td>
-              </tr>
-              <tr>
-                <td><div style="font-weight:600;">🌳 Plant Trees</div></td>
-                <td style="font-family:'Sora',sans-serif;font-weight:700;">₹500</td>
-                <td style="color:var(--text2);">Apr 22, 2026</td>
-                <td><span class="ngo-badge">🏢 GreenIndia NGO <span class="verified-tick">✓</span></span></td>
-                <td style="color:var(--text2);font-size:.82rem;">Dehradun, UK</td>
-                <td><a href="#" class="proof-btn" onclick="openProofModal()">▶ Watch</a></td>
-                <td><span class="badge badge-green">✅ Verified</span></td>
-              </tr>
-              <tr>
-                <td><div style="font-weight:600;">🧺 Essentials Kit</div></td>
-                <td style="font-family:'Sora',sans-serif;font-weight:700;">₹250</td>
-                <td style="color:var(--text2);">Apr 15, 2026</td>
-                <td><span class="ngo-badge">🏢 CareCrew India <span class="verified-tick">✓</span></span></td>
-                <td style="color:var(--text2);font-size:.82rem;">Kanpur, UP</td>
-                <td><a href="#" class="proof-btn" onclick="openProofModal()">▶ Watch</a></td>
-                <td><span class="badge badge-blue">🕐 In Progress</span></td>
-              </tr>
-              <tr>
-                <td><div style="font-weight:600;">🍱 Feed the Hungry</div></td>
-                <td style="font-family:'Sora',sans-serif;font-weight:700;">₹50</td>
-                <td style="color:var(--text2);">Apr 8, 2026</td>
-                <td><span class="ngo-badge">🏢 Sewa Foundation <span class="verified-tick">✓</span></span></td>
-                <td style="color:var(--text2);font-size:.82rem;">Varanasi, UP</td>
-                <td><a href="#" class="proof-btn" onclick="openProofModal()">▶ Watch</a></td>
-                <td><span class="badge badge-green">✅ Verified</span></td>
-              </tr>
-              <tr>
-                <td><div style="font-weight:600;">🌳 Plant Trees</div></td>
-                <td style="font-family:'Sora',sans-serif;font-weight:700;">₹200</td>
-                <td style="color:var(--text2);">Mar 21, 2026</td>
-                <td><span class="ngo-badge">🏢 GreenIndia NGO <span class="verified-tick">✓</span></span></td>
-                <td style="color:var(--text2);font-size:.82rem;">Rishikesh, UK</td>
-                <td><a href="#" class="proof-btn" onclick="openProofModal()">▶ Watch</a></td>
-                <td><span class="badge badge-green">✅ Verified</span></td>
-              </tr>
-            </tbody>
+            <thead><tr><th>Type</th><th>Tokens</th><th>Date</th><th>Status</th><th>Reference</th></tr></thead>
+            <tbody id="dashboard-history"><tr><td colspan="5" style="color:var(--text2);">Real token activity will appear here.</td></tr></tbody>
           </table>
         </div>
       </div>
 
-      <!-- BADGES TAB -->
       <div id="dtab-badges" style="display:none;">
         <h2 style="font-size:1.4rem;font-weight:800;margin-bottom:1.25rem;">Badges & Achievements</h2>
-        <div class="card" style="margin-bottom:1.5rem;">
-          <h4 style="font-weight:700;margin-bottom:.35rem;">🔥 XP Progress</h4>
-          <div style="font-size:.85rem;color:var(--text2);margin-bottom:1rem;">1,840 / 2,500 XP — Impact Creator Level 4</div>
-          <div class="progress-track" style="height:12px;"><div class="progress-fill" style="width:73%"></div></div>
-          <div style="display:flex;justify-content:space-between;font-size:.78rem;color:var(--text3);margin-top:.5rem;"><span>Level 4</span><span>Level 5 — Champion</span></div>
-        </div>
-        <h4 style="font-weight:700;margin-bottom:1rem;">🏅 Your Badges</h4>
-        <div class="badges-grid">
-          <div class="badge-item earned"><div class="b-icon">🥇</div><div class="b-name">First Donation</div></div>
-          <div class="badge-item earned"><div class="b-icon">🔥</div><div class="b-name">7-Day Streak</div></div>
-          <div class="badge-item earned"><div class="b-icon">💎</div><div class="b-name">Consistent Giver</div></div>
-          <div class="badge-item earned"><div class="b-icon">🌳</div><div class="b-name">Tree Planter</div></div>
-          <div class="badge-item"><div class="b-icon">🦁</div><div class="b-name">Champion</div></div>
-          <div class="badge-item"><div class="b-icon">🚀</div><div class="b-name">Impact Creator</div></div>
-          <div class="badge-item"><div class="b-icon">👑</div><div class="b-name">Legend</div></div>
-          <div class="badge-item"><div class="b-icon">🌍</div><div class="b-name">Global Giver</div></div>
-        </div>
-        <p style="font-size:.82rem;color:var(--text3);margin-top:1rem;">Dimmed badges are yet to be earned. Keep contributing!</p>
+        <div id="dashboard-badges" class="card"><p style="color:var(--text2);">Badges unlock from real account activity.</p></div>
       </div>
 
-      <!-- GAMIFICATION TAB -->
       <div id="dtab-gamification" style="display:none;">
         <h2 style="font-size:1.4rem;font-weight:800;margin-bottom:1.25rem;">Your Progression Journey</h2>
-        <div class="card" style="margin-bottom:1.5rem;overflow:auto;">
-          <div class="level-path">
-            <div class="level-node done"><div class="l-icon">🌱</div><div class="l-name">Beginner</div><div class="l-xp">0–200 XP</div></div>
-            <div class="level-node done"><div class="l-icon">🤝</div><div class="l-name">Contributor</div><div class="l-xp">200–600 XP</div></div>
-            <div class="level-node done"><div class="l-icon">⭐</div><div class="l-name">Active Supporter</div><div class="l-xp">600–1200 XP</div></div>
-            <div class="level-node current"><div class="l-icon">💥</div><div class="l-name">Impact Creator</div><div class="l-xp">1200–2500 XP</div></div>
-            <div class="level-node"><div class="l-icon">🏆</div><div class="l-name">Champion</div><div class="l-xp">2500–5000 XP</div></div>
-            <div class="level-node"><div class="l-icon">👑</div><div class="l-name">Legend</div><div class="l-xp">5000+ XP</div></div>
-          </div>
-        </div>
-        <h4 style="font-weight:700;margin-bottom:1rem;">⚡ How to Earn XP</h4>
-        <div class="grid-2">
-          <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;"><span>💸 Make a donation</span><span class="badge badge-blue">+10 XP</span></div></div>
-          <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;"><span>✅ Verify a task</span><span class="badge badge-blue">+5 XP</span></div></div>
-          <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;"><span>🔥 7-day donation streak</span><span class="badge badge-orange">+50 XP</span></div></div>
-          <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;"><span>⭐ Rate an NGO</span><span class="badge badge-blue">+3 XP</span></div></div>
-          <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;"><span>👥 Refer a friend</span><span class="badge badge-orange">+100 XP</span></div></div>
-          <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;"><span>🏅 Earn a badge</span><span class="badge badge-purple">+25 XP</span></div></div>
-        </div>
+        <div id="dashboard-progression" class="card"><p style="color:var(--text2);">Progression is calculated from your XP, token balance, and impact score.</p></div>
       </div>
     </div>
   </div>
 </div>
-
 <!-- ============ TRANSPARENCY PAGE ============ -->
 <div id="page-transparency" class="page">
   <section style="background:var(--bg2);padding:3rem 2rem 2rem;">
     <div class="container">
-      <div class="section-label">🔍 Full Transparency</div>
-      <h2 class="section-title">Every Task. Verified. Public.</h2>
-      <p class="section-sub">A live log of all completed work by our NGO network. Nothing hidden.</p>
+      <div class="section-label">Full Transparency</div>
+      <h2 class="section-title">Verified Activity Log</h2>
+      <p class="section-sub">Published proof appears only after admin verification from MongoDB records.</p>
     </div>
   </section>
   <section style="padding-top:2rem;">
     <div class="container">
-      <div class="grid-2">
-        <div class="timeline">
-          <div class="timeline-item">
-            <div class="timeline-dot"></div>
-            <div class="timeline-card">
-              <div class="t-header">
-                <h4>🍱 500 Meals Distributed</h4>
-                <span class="badge badge-green">✅ Verified</span>
-              </div>
-              <div class="t-meta">📅 May 1, 2026 &nbsp;|&nbsp; 📍 Lucknow, UP &nbsp;|&nbsp; 🏢 Sewa Foundation</div>
-              <p style="font-size:.85rem;color:var(--text2);line-height:1.5;">Hot meals distributed to 500 underprivileged children across 3 schools in Lucknow's Aliganj area. Partnered with local kitchen.</p>
-              <div class="t-footer">
-                <div style="font-size:.8rem;color:var(--text3);">👥 48 contributors funded this</div>
-                <a href="#" class="proof-btn" onclick="openProofModal()">▶ Watch Proof</a>
-              </div>
-            </div>
-          </div>
-          <div class="timeline-item">
-            <div class="timeline-dot" style="background:var(--orange);box-shadow:0 0 0 3px var(--orange-light);"></div>
-            <div class="timeline-card">
-              <div class="t-header">
-                <h4>🌳 200 Saplings Planted</h4>
-                <span class="badge badge-green">✅ Verified</span>
-              </div>
-              <div class="t-meta">📅 Apr 22, 2026 &nbsp;|&nbsp; 📍 Dehradun, UK &nbsp;|&nbsp; 🏢 GreenIndia NGO</div>
-              <p style="font-size:.85rem;color:var(--text2);line-height:1.5;">200 native saplings planted along the Rispana river bank. GPS coordinates uploaded. 6-month survival monitoring started.</p>
-              <div class="t-footer">
-                <div style="font-size:.8rem;color:var(--text3);">👥 84 contributors funded this</div>
-                <a href="#" class="proof-btn" onclick="openProofModal()">▶ Watch Proof</a>
-              </div>
-            </div>
-          </div>
-          <div class="timeline-item">
-            <div class="timeline-dot"></div>
-            <div class="timeline-card">
-              <div class="t-header">
-                <h4>🧺 150 Hygiene Kits Delivered</h4>
-                <span class="badge badge-green">✅ Verified</span>
-              </div>
-              <div class="t-meta">📅 Apr 15, 2026 &nbsp;|&nbsp; 📍 Kanpur, UP &nbsp;|&nbsp; 🏢 CareCrew India</div>
-              <p style="font-size:.85rem;color:var(--text2);line-height:1.5;">Hygiene kits with soap, masks, and sanitizer distributed to migrant worker families. Each kit photographed and logged.</p>
-              <div class="t-footer">
-                <div style="font-size:.8rem;color:var(--text3);">👥 63 contributors funded this</div>
-                <a href="#" class="proof-btn" onclick="openProofModal()">▶ Watch Proof</a>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="timeline">
-          <div class="timeline-item">
-            <div class="timeline-dot" style="background:var(--orange);box-shadow:0 0 0 3px var(--orange-light);"></div>
-            <div class="timeline-card">
-              <div class="t-header">
-                <h4>🍱 320 Meals — School Drive</h4>
-                <span class="badge badge-green">✅ Verified</span>
-              </div>
-              <div class="t-meta">📅 Apr 8, 2026 &nbsp;|&nbsp; 📍 Varanasi, UP &nbsp;|&nbsp; 🏢 Sewa Foundation</div>
-              <p style="font-size:.85rem;color:var(--text2);line-height:1.5;">Mid-day meal supplement provided to 4 government schools. Nutritionist-approved menu, preparation video uploaded.</p>
-              <div class="t-footer">
-                <div style="font-size:.8rem;color:var(--text3);">👥 31 contributors funded this</div>
-                <a href="#" class="proof-btn" onclick="openProofModal()">▶ Watch Proof</a>
-              </div>
-            </div>
-          </div>
-          <div class="timeline-item">
-            <div class="timeline-dot"></div>
-            <div class="timeline-card">
-              <div class="t-header">
-                <h4>🌳 80 Saplings — Riverside</h4>
-                <span class="badge badge-blue">🕐 Monitoring</span>
-              </div>
-              <div class="t-meta">📅 Mar 21, 2026 &nbsp;|&nbsp; 📍 Rishikesh, UK &nbsp;|&nbsp; 🏢 GreenIndia NGO</div>
-              <p style="font-size:.85rem;color:var(--text2);line-height:1.5;">80 Bargad saplings planted on Ganga riverbank. Monthly photo updates shared. Current survival rate: 94%.</p>
-              <div class="t-footer">
-                <div style="font-size:.8rem;color:var(--text3);">👥 27 contributors funded this</div>
-                <a href="#" class="proof-btn" onclick="openProofModal()">▶ Watch Proof</a>
-              </div>
-            </div>
-          </div>
-        </div>
+      <div class="timeline" id="transparency-feed">
+        <div class="timeline-item"><div class="timeline-dot"></div><div class="timeline-card"><h4>No verified activity published yet</h4><p style="font-size:.85rem;color:var(--text2);line-height:1.5;">Completed work logs will appear here after admin review. No placeholder proof is shown.</p></div></div>
       </div>
     </div>
   </section>
-  <footer>
-    <p>📞 9557740764 &nbsp;|&nbsp; ✉️ <a href="mailto:th.piyushsingh2007@gmail.com">th.piyushsingh2007@gmail.com</a></p>
-  </footer>
+  <footer><p>Phone 9557740764 &nbsp;|&nbsp; <a href="mailto:th.piyushsingh2007@gmail.com">th.piyushsingh2007@gmail.com</a></p></footer>
 </div>
-
 <!-- ============ NGO PAGE ============ -->
 <div id="page-ngos" class="page">
   <section style="background:var(--bg2);padding:3rem 2rem 2rem;">
     <div class="container" style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:1rem;">
       <div>
-        <div class="section-label">🏢 NGO Network</div>
-        <h2 class="section-title">Verified NGO Partners</h2>
-        <p class="section-sub">Only platform-verified NGOs with their own volunteer teams can operate on ServeMate.</p>
+        <div class="section-label">NGO Network</div>
+        <h2 class="section-title">Approved NGO Partners</h2>
+        <p class="section-sub">Only admin-approved NGOs from MongoDB are shown publicly.</p>
       </div>
       <button class="btn btn-orange" onclick="openNGORegModal()">+ Register Your NGO</button>
     </div>
   </section>
-
-  <section style="padding-top:2rem;">
-    <div class="container">
-      <div class="grid-3">
-        <div class="card ngo-card">
-          <div class="ngo-rank">#1</div>
-          <div class="ngo-avatar">🌾</div>
-          <div class="ngo-name"><button class="lb-name-btn" onclick="openNGOProfile('sewa')" style="font-size:1rem;font-weight:700;">Sewa Foundation</button> <span class="verified-tick" title="Verified">✓</span></div>
-          <div style="font-size:.82rem;color:var(--text2);margin-bottom:.5rem;">📍 Lucknow, Uttar Pradesh</div>
-          <div class="star-rating">★★★★★ <span style="color:var(--text2);font-size:.8rem;">4.9 (248 reviews)</span></div>
-          <div class="ngo-stat-row">
-            <div class="ngo-stat"><div class="n">312</div><div class="l">Tasks Done</div></div>
-            <div class="ngo-stat"><div class="n">28</div><div class="l">Volunteers</div></div>
-            <div class="ngo-stat"><div class="n">98</div><div class="l">Impact Score</div></div>
-          </div>
-          <div style="margin-top:1rem;display:flex;gap:.5rem;flex-wrap:wrap;">
-            <span class="badge badge-green">🥇 Top Performer</span>
-            <span class="badge badge-blue">🍱 Meals</span>
-          </div>
-        </div>
-        <div class="card ngo-card">
-          <div class="ngo-rank">#2</div>
-          <div class="ngo-avatar">🌿</div>
-          <div class="ngo-name"><button class="lb-name-btn" onclick="openNGOProfile('green')" style="font-size:1rem;font-weight:700;">GreenIndia NGO</button> <span class="verified-tick" title="Verified">✓</span></div>
-          <div style="font-size:.82rem;color:var(--text2);margin-bottom:.5rem;">📍 Dehradun, Uttarakhand</div>
-          <div class="star-rating">★★★★★ <span style="color:var(--text2);font-size:.8rem;">4.8 (192 reviews)</span></div>
-          <div class="ngo-stat-row">
-            <div class="ngo-stat"><div class="n">248</div><div class="l">Tasks Done</div></div>
-            <div class="ngo-stat"><div class="n">19</div><div class="l">Volunteers</div></div>
-            <div class="ngo-stat"><div class="n">95</div><div class="l">Impact Score</div></div>
-          </div>
-          <div style="margin-top:1rem;display:flex;gap:.5rem;flex-wrap:wrap;">
-            <span class="badge badge-green">🌳 Eco Champion</span>
-          </div>
-        </div>
-        <div class="card ngo-card">
-          <div class="ngo-rank">#3</div>
-          <div class="ngo-avatar">💙</div>
-          <div class="ngo-name"><button class="lb-name-btn" onclick="openNGOProfile('care')" style="font-size:1rem;font-weight:700;">CareCrew India</button> <span class="verified-tick" title="Verified">✓</span></div>
-          <div style="font-size:.82rem;color:var(--text2);margin-bottom:.5rem;">📍 Kanpur, Uttar Pradesh</div>
-          <div class="star-rating">★★★★☆ <span style="color:var(--text2);font-size:.8rem;">4.6 (134 reviews)</span></div>
-          <div class="ngo-stat-row">
-            <div class="ngo-stat"><div class="n">186</div><div class="l">Tasks Done</div></div>
-            <div class="ngo-stat"><div class="n">15</div><div class="l">Volunteers</div></div>
-            <div class="ngo-stat"><div class="n">91</div><div class="l">Impact Score</div></div>
-          </div>
-          <div style="margin-top:1rem;display:flex;gap:.5rem;flex-wrap:wrap;">
-            <span class="badge badge-blue">🧺 Essentials</span>
-          </div>
-        </div>
-        <div class="card ngo-card">
-          <div class="ngo-rank">#4</div>
-          <div class="ngo-avatar">☀️</div>
-          <div class="ngo-name"><button class="lb-name-btn" onclick="openNGOProfile('udaan')" style="font-size:1rem;font-weight:700;">Udaan Foundation</button> <span class="verified-tick" title="Verified">✓</span></div>
-          <div style="font-size:.82rem;color:var(--text2);margin-bottom:.5rem;">📍 Agra, Uttar Pradesh</div>
-          <div class="star-rating">★★★★☆ <span style="color:var(--text2);font-size:.8rem;">4.5 (98 reviews)</span></div>
-          <div class="ngo-stat-row">
-            <div class="ngo-stat"><div class="n">142</div><div class="l">Tasks Done</div></div>
-            <div class="ngo-stat"><div class="n">12</div><div class="l">Volunteers</div></div>
-            <div class="ngo-stat"><div class="n">88</div><div class="l">Impact Score</div></div>
-          </div>
-          <div style="margin-top:1rem;display:flex;gap:.5rem;flex-wrap:wrap;">
-            <span class="badge badge-orange">🆕 Rising Star</span>
-          </div>
-        </div>
-        <div class="card ngo-card">
-          <div class="ngo-rank">#5</div>
-          <div class="ngo-avatar">🌸</div>
-          <div class="ngo-name"><button class="lb-name-btn" onclick="openNGOProfile('mamta')" style="font-size:1rem;font-weight:700;">Mamta Sewa Trust</button> <span class="verified-tick" title="Verified">✓</span></div>
-          <div style="font-size:.82rem;color:var(--text2);margin-bottom:.5rem;">📍 Prayagraj, UP</div>
-          <div class="star-rating">★★★★☆ <span style="color:var(--text2);font-size:.8rem;">4.4 (76 reviews)</span></div>
-          <div class="ngo-stat-row">
-            <div class="ngo-stat"><div class="n">98</div><div class="l">Tasks Done</div></div>
-            <div class="ngo-stat"><div class="n">10</div><div class="l">Volunteers</div></div>
-            <div class="ngo-stat"><div class="n">85</div><div class="l">Impact Score</div></div>
-          </div>
-          <div style="margin-top:1rem;display:flex;gap:.5rem;flex-wrap:wrap;">
-            <span class="badge badge-blue">🍱 Meals</span><span class="badge badge-blue">🧺 Essentials</span>
-          </div>
-        </div>
-        <div class="card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;min-height:220px;border-style:dashed;cursor:pointer;" onclick="openNGORegModal()">
-          <div style="font-size:2.5rem;margin-bottom:.75rem;">➕</div>
-          <h4 style="font-weight:700;margin-bottom:.35rem;">Register Your NGO</h4>
-          <p style="font-size:.85rem;color:var(--text2);">Join our verified partner network and start making real impact.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-  <footer>
-    <p>📞 9557740764 &nbsp;|&nbsp; ✉️ <a href="mailto:th.piyushsingh2007@gmail.com">th.piyushsingh2007@gmail.com</a></p>
-  </footer>
+  <section style="padding-top:2rem;"><div class="container"><div class="grid-3"><div class="card"><h4>No approved NGOs yet</h4><p style="font-size:.85rem;color:var(--text2);">Approved NGO applications will appear here after admin review.</p></div></div></div></section>
+  <footer><p>Phone 9557740764 &nbsp;|&nbsp; <a href="mailto:th.piyushsingh2007@gmail.com">th.piyushsingh2007@gmail.com</a></p></footer>
 </div>
-
 <!-- ============ LEADERBOARD PAGE ============ -->
 <div id="page-leaderboard" class="page">
   <section style="background:var(--bg2);padding:3rem 2rem 2rem;">
     <div class="container">
-      <div class="section-label">🏆 Rankings</div>
+      <div class="section-label">Rankings</div>
       <h2 class="section-title">Leaderboard</h2>
-      <p class="section-sub">The most impactful donors and NGOs, ranked by real contributions.</p>
+      <p class="section-sub">Top users and NGOs are ranked only from live MongoDB token, XP, and impact records.</p>
     </div>
   </section>
   <section style="padding-top:2rem;">
     <div class="container">
       <div class="lb-tabs">
-        <button class="lb-tab active" onclick="switchLB('donors', this)">🏅 Top Donors</button>
-        <button class="lb-tab" onclick="switchLB('ngos', this)">🏢 Top NGOs</button>
+        <button class="lb-tab active" onclick="switchLB('donors', this)">Top Users</button>
+        <button class="lb-tab" onclick="switchLB('ngos', this)">Top NGOs</button>
       </div>
-      <div id="lb-donors">
-        <div class="lb-row">
-          <div class="lb-rank gold">🥇</div>
-          <div class="lb-avatar">RS</div>
-          <div class="flex-1"><div class="lb-name"><button class="lb-name-btn" onclick="openUserProfile('rahul')">Rahul Sharma</button></div><div class="lb-location">📍 Delhi</div></div>
-          <div style="text-align:right;"><div class="lb-xp">4,820 XP</div><div class="lb-count">96 donations</div></div>
-        </div>
-        <div class="lb-row">
-          <div class="lb-rank silver">🥈</div>
-          <div class="lb-avatar">AP</div>
-          <div class="flex-1"><div class="lb-name"><button class="lb-name-btn" onclick="openUserProfile('anjali')">Anjali Patel</button></div><div class="lb-location">📍 Mumbai</div></div>
-          <div style="text-align:right;"><div class="lb-xp">3,960 XP</div><div class="lb-count">78 donations</div></div>
-        </div>
-        <div class="lb-row">
-          <div class="lb-rank bronze">🥉</div>
-          <div class="lb-avatar">VK</div>
-          <div class="flex-1"><div class="lb-name"><button class="lb-name-btn" onclick="openUserProfile('vikram')">Vikram Khanna</button></div><div class="lb-location">📍 Bangalore</div></div>
-          <div style="text-align:right;"><div class="lb-xp">3,420 XP</div><div class="lb-count">67 donations</div></div>
-        </div>
-        <div class="lb-row">
-          <div class="lb-rank" style="color:var(--text2);">4</div>
-          <div class="lb-avatar" style="background:linear-gradient(135deg,#7c3aed,#db2777);">PS</div>
-          <div class="flex-1"><div class="lb-name"><button class="lb-name-btn" onclick="openUserProfile('piyush')">Piyush Singh</button> <span class="badge badge-blue" style="font-size:.7rem;">You</span></div><div class="lb-location">📍 Lucknow</div></div>
-          <div style="text-align:right;"><div class="lb-xp">1,840 XP</div><div class="lb-count">47 donations</div></div>
-        </div>
-        <div class="lb-row">
-          <div class="lb-rank" style="color:var(--text2);">5</div>
-          <div class="lb-avatar" style="background:linear-gradient(135deg,#059669,#0891b2);">NM</div>
-          <div class="flex-1"><div class="lb-name"><button class="lb-name-btn" onclick="openUserProfile('neha')">Neha Mishra</button></div><div class="lb-location">📍 Jaipur</div></div>
-          <div style="text-align:right;"><div class="lb-xp">1,680 XP</div><div class="lb-count">43 donations</div></div>
-        </div>
-        <div class="lb-row">
-          <div class="lb-rank" style="color:var(--text2);">6</div>
-          <div class="lb-avatar" style="background:linear-gradient(135deg,#dc2626,#ea580c);">AK</div>
-          <div class="flex-1"><div class="lb-name"><button class="lb-name-btn" onclick="openUserProfile('arjun')">Arjun Kumar</button></div><div class="lb-location">📍 Chennai</div></div>
-          <div style="text-align:right;"><div class="lb-xp">1,420 XP</div><div class="lb-count">38 donations</div></div>
-        </div>
-      </div>
-      <div id="lb-ngos" style="display:none;">
-        <div class="lb-row">
-          <div class="lb-rank gold">🥇</div>
-          <div class="lb-avatar" style="background:var(--blue-light);color:var(--blue);">SF</div>
-          <div class="flex-1"><div class="lb-name"><button class="lb-name-btn" onclick="openNGOProfile('sewa')">Sewa Foundation ✓</button></div><div class="lb-location">📍 Lucknow, UP</div></div>
-          <div style="text-align:right;"><div class="lb-xp">Impact: 98</div><div class="lb-count">312 tasks done</div></div>
-        </div>
-        <div class="lb-row">
-          <div class="lb-rank silver">🥈</div>
-          <div class="lb-avatar" style="background:#dcfce7;color:#16a34a;">GI</div>
-          <div class="flex-1"><div class="lb-name"><button class="lb-name-btn" onclick="openNGOProfile('green')">GreenIndia NGO ✓</button></div><div class="lb-location">📍 Dehradun, UK</div></div>
-          <div style="text-align:right;"><div class="lb-xp">Impact: 95</div><div class="lb-count">248 tasks done</div></div>
-        </div>
-        <div class="lb-row">
-          <div class="lb-rank bronze">🥉</div>
-          <div class="lb-avatar" style="background:#f3e8ff;color:#7c3aed;">CC</div>
-          <div class="flex-1"><div class="lb-name"><button class="lb-name-btn" onclick="openNGOProfile('care')">CareCrew India ✓</button></div><div class="lb-location">📍 Kanpur, UP</div></div>
-          <div style="text-align:right;"><div class="lb-xp">Impact: 91</div><div class="lb-count">186 tasks done</div></div>
-        </div>
-        <div class="lb-row">
-          <div class="lb-rank" style="color:var(--text2);">4</div>
-          <div class="lb-avatar" style="background:var(--orange-light);color:var(--orange);">UF</div>
-          <div class="flex-1"><div class="lb-name"><button class="lb-name-btn" onclick="openNGOProfile('udaan')">Udaan Foundation ✓</button></div><div class="lb-location">📍 Agra, UP</div></div>
-          <div style="text-align:right;"><div class="lb-xp">Impact: 88</div><div class="lb-count">142 tasks done</div></div>
-        </div>
-      </div>
+      <div id="lb-donors"><div class="card"><h4>No rankings yet</h4><p style="font-size:.85rem;color:var(--text2);">Real rankings appear after token activity exists.</p></div></div>
+      <div id="lb-ngos" style="display:none;"><div class="card"><h4>No NGO rankings yet</h4><p style="font-size:.85rem;color:var(--text2);">Approved NGOs appear after admin review.</p></div></div>
     </div>
   </section>
-  <footer>
-    <p>📞 9557740764 &nbsp;|&nbsp; ✉️ <a href="mailto:th.piyushsingh2007@gmail.com">th.piyushsingh2007@gmail.com</a></p>
-  </footer>
+  <footer><p>Phone 9557740764 &nbsp;|&nbsp; <a href="mailto:th.piyushsingh2007@gmail.com">th.piyushsingh2007@gmail.com</a></p></footer>
 </div>
-
 <!-- ============ CONTACT PAGE ============ -->
 <div id="page-contact" class="page">
   <section style="background:var(--bg2);padding:3rem 2rem 2rem;">
@@ -1507,7 +1093,7 @@
             <select>
               <option>General Inquiry</option>
               <option>NGO Partnership</option>
-              <option>Donation Query</option>
+              <option>Token Query</option>
               <option>Technical Support</option>
               <option>Media / Press</option>
             </select>
@@ -1530,7 +1116,7 @@
   <div class="modal">
     <button class="modal-close" onclick="closeModal('auth-modal')">✕</button>
     <h2>Welcome to ServeMate</h2>
-    <p class="sub">Join 12,400+ contributors making real impact.</p>
+    <p class="sub">Create an account to use real ServeMATE token workflows.</p>
     <div class="modal-tabs">
       <button class="tab-btn active" onclick="switchAuthTab('login', this)">Login</button>
       <button class="tab-btn" onclick="switchAuthTab('register', this)">Register</button>
@@ -1554,8 +1140,8 @@
   <div class="modal" id="donate-modal-inner">
     <button class="modal-close" onclick="closeModal('donate-modal')">✕</button>
     <div id="donate-step1">
-      <h2>Make a Donation</h2>
-      <p class="sub">100% goes to the cause. Proof guaranteed.</p>
+      <h2>Use Support Tokens</h2>
+      <p class="sub">Purchase or spend virtual support tokens. This is not a real donation receipt.</p>
       <div class="form-group">
         <label>Select Cause</label>
         <select id="donate-cause">
@@ -1564,31 +1150,31 @@
           <option value="essentials">🧺 Essentials Kit</option>
         </select>
       </div>
-      <label style="font-size:.8rem;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:.75rem;">Select Amount</label>
+      <label style="font-size:.8rem;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:.75rem;">Select Tokens</label>
       <div class="amount-grid">
-        <button class="amount-btn" onclick="selectAmount(10, this)">₹10</button>
-        <button class="amount-btn active" onclick="selectAmount(50, this)">₹50</button>
-        <button class="amount-btn" onclick="selectAmount(100, this)">₹100</button>
-        <button class="amount-btn" onclick="selectAmount(250, this)">₹250</button>
-        <button class="amount-btn" onclick="selectAmount(500, this)">₹500</button>
-        <button class="amount-btn" onclick="selectAmount(1000, this)">₹1000</button>
+        <button class="amount-btn" onclick="selectAmount(10, this)">10 tokens</button>
+        <button class="amount-btn active" onclick="selectAmount(50, this)">50 tokens</button>
+        <button class="amount-btn" onclick="selectAmount(100, this)">100 tokens</button>
+        <button class="amount-btn" onclick="selectAmount(250, this)">250 tokens</button>
+        <button class="amount-btn" onclick="selectAmount(500, this)">500 tokens</button>
+        <button class="amount-btn" onclick="selectAmount(1000, this)">1000 tokens</button>
       </div>
       <div class="form-group">
         <label>Or Enter Custom Amount</label>
-        <input type="number" id="custom-amount" placeholder="₹ Enter amount" oninput="updateImpact()">
+        <input type="number" id="custom-amount" placeholder="Enter token amount" oninput="updateImpact()">
       </div>
       <div class="impact-preview" id="impact-preview">
-        <p>🍱 ₹50 = <strong>5 meals</strong> for hungry children. Served by Sewa Foundation, Lucknow.</p>
+        <p>50 tokens can be used for a virtual support action after payment verification.</p>
       </div>
-      <button class="btn btn-primary btn-full btn-lg" onclick="showDonateSuccess()">Donate Now 🤝</button>
+      <button class="btn btn-primary btn-full btn-lg" onclick="showDonateSuccess()">Continue 🤝</button>
     </div>
     <div id="donate-step2" style="display:none;">
       <div class="success-screen">
         <div class="success-icon">🎉</div>
-        <h3>Donation Successful!</h3>
-        <p style="margin-bottom:1rem;">You donated <strong id="success-amount">₹50</strong> to <strong>Feed the Hungry</strong>.</p>
+        <h3>Token Action Successful!</h3>
+        <p style="margin-bottom:1rem;">You used <strong id="success-amount">0 tokens</strong> for a virtual support action.</p>
         <div class="badge badge-orange" style="margin:.5rem auto;display:inline-flex;">+10 XP Earned!</div>
-        <p style="margin-top:1rem;font-size:.85rem;color:var(--text2);">You'll receive proof of work within 48 hours. Track it in your Dashboard.</p>
+        <p style="margin-top:1rem;font-size:.85rem;color:var(--text2);">Track status in your Dashboard after admin review.</p>
         <button class="btn btn-primary btn-full" style="margin-top:1.5rem;" onclick="closeModal('donate-modal');showPage('dashboard')">View in Dashboard</button>
       </div>
     </div>
@@ -1600,19 +1186,15 @@
   <div class="modal">
     <button class="modal-close" onclick="closeModal('proof-modal')">✕</button>
     <h2>📹 Proof of Work</h2>
-    <p class="sub">Verified by ServeMate platform on May 1, 2026</p>
+    <p class="sub">Proof appears here only after admin verification</p>
     <div style="background:var(--bg3);border-radius:var(--radius-sm);padding:2rem;text-align:center;margin-bottom:1rem;">
       <div style="font-size:3rem;margin-bottom:.75rem;">▶️</div>
-      <p style="font-weight:600;margin-bottom:.35rem;">Feed the Hungry — Lucknow Drive</p>
-      <p style="font-size:.82rem;color:var(--text2);">500 meals distributed · Sewa Foundation · May 1, 2026</p>
-      <div style="margin-top:1rem;display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap;">
-        <span class="badge badge-green">📍 GPS Verified</span>
-        <span class="badge badge-blue">📸 72 Photos</span>
-        <span class="badge badge-purple">⏱ 4hr Duration</span>
-      </div>
+      <p style="font-weight:600;margin-bottom:.35rem;">No proof selected</p>
+      <p style="font-size:.82rem;color:var(--text2);">No proof selected</p>
+      <div style="margin-top:1rem;display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap;"><span class="badge badge-blue">Admin-verified proof appears here</span></div>
     </div>
-    <p style="font-size:.82rem;color:var(--text2);line-height:1.6;">In a real implementation, this would embed the YouTube proof video uploaded by the NGO after task completion.</p>
-    <button class="btn btn-primary btn-full" style="margin-top:1rem;" onclick="closeModal('proof-modal');showToast('⭐ Rated Sewa Foundation 5 stars!')">✅ Verify & Rate NGO</button>
+    <p style="font-size:.82rem;color:var(--text2);line-height:1.6;">Verified proof videos appear here after an admin publishes them.</p>
+    <button class="btn btn-primary btn-full" style="margin-top:1rem;" onclick="closeModal('proof-modal');showToast('Rating saved after verification.')">✅ Verify & Rate NGO</button>
   </div>
 </div>
 
@@ -1701,19 +1283,15 @@
 
   function updateImpact() {
     const custom = document.getElementById('custom-amount').value;
-    const amt = custom ? parseInt(custom) : currentDonateAmount;
-    const cause = document.getElementById('donate-cause').value;
-    let msg = '';
-    if (cause === 'meals') msg = `🍱 ₹${amt} = <strong>${Math.floor(amt/10)} meal(s)</strong> for hungry children. Served by Sewa Foundation.`;
-    else if (cause === 'trees') msg = `🌳 ₹${amt} = <strong>${Math.floor(amt/50)} sapling(s)</strong> planted & GPS-tracked. By GreenIndia NGO.`;
-    else msg = `🧺 ₹${amt} = <strong>${Math.floor(amt/100)} hygiene kit(s)</strong> for families in need. By CareCrew India.`;
-    document.getElementById('impact-preview').innerHTML = `<p>${msg}</p>`;
+    const amt = custom ? parseInt(custom, 10) : currentDonateAmount;
+    const safeAmount = Number.isFinite(amt) && amt > 0 ? amt : 0;
+    document.getElementById('impact-preview').innerHTML = `<p>${safeAmount} virtual support token(s) selected.</p>`;
   }
 
   function showDonateSuccess() {
     const custom = document.getElementById('custom-amount').value;
     const amt = custom ? parseInt(custom) : currentDonateAmount;
-    document.getElementById('success-amount').textContent = '₹' + amt;
+    document.getElementById('success-amount').textContent = amt + ' tokens';
     document.getElementById('donate-step1').style.display = 'none';
     document.getElementById('donate-step2').style.display = '';
   }
@@ -1759,15 +1337,15 @@
     <div class="pm-banner"></div>
     <div id="upm-avatar" class="pm-avatar" style="background:linear-gradient(135deg,var(--blue),var(--orange));">U</div>
     <div class="pm-body">
-      <div class="pm-name" id="upm-name">User Name</div>
-      <div class="pm-sub" id="upm-sub">📍 City &nbsp;|&nbsp; Member since 2024 &nbsp;|&nbsp; ⭐ Level 4</div>
+      <div class="pm-name" id="upm-name">Member</div>
+      <div class="pm-sub" id="upm-sub">Profile details load from your account</div>
       <div class="pm-stats" id="upm-stats"></div>
       <div class="pm-section">
         <h4>🏅 Badges Earned</h4>
         <div class="pm-badges" id="upm-badges"></div>
       </div>
       <div class="pm-section">
-        <h4>📋 Recent Donations</h4>
+        <h4>📋 Recent Token Activity</h4>
         <div class="pm-history" id="upm-history"></div>
       </div>
     </div>
@@ -1815,235 +1393,18 @@
 </div>
 
 <script>
-/* ---- USER PROFILES DATA ---- */
-const USER_PROFILES = {
-  rahul: {
-    name: 'Rahul Sharma', initials: 'RS', city: 'Delhi', since: 'Mar 2023', level: 'Level 5 — Champion',
-    gradient: 'linear-gradient(135deg,#f59e0b,#d97706)',
-    stats: [
-      {n:'₹12,400',l:'Total Donated'},{n:'4,820',l:'XP Points'},{n:'96',l:'Donations'},{n:'1st',l:'Rank'}
-    ],
-    badges: ['🥇 First Donation','🔥 7-Day Streak','💎 Consistent Giver','🌳 Tree Planter','🦁 Champion'],
-    history: [
-      {icon:'🍱',title:'Feed the Hungry — Lucknow',date:'May 2, 2026',amt:'₹500'},
-      {icon:'🌳',title:'Plant Trees — Dehradun',date:'Apr 28, 2026',amt:'₹1,000'},
-      {icon:'🧺',title:'Essentials Kit — Kanpur',date:'Apr 20, 2026',amt:'₹750'},
-      {icon:'🍱',title:'Feed the Hungry — Varanasi',date:'Apr 12, 2026',amt:'₹300'},
-    ]
-  },
-  anjali: {
-    name: 'Anjali Patel', initials: 'AP', city: 'Mumbai', since: 'Jun 2023', level: 'Level 5 — Champion',
-    gradient: 'linear-gradient(135deg,#3b82f6,#7c3aed)',
-    stats: [
-      {n:'₹9,800',l:'Total Donated'},{n:'3,960',l:'XP Points'},{n:'78',l:'Donations'},{n:'2nd',l:'Rank'}
-    ],
-    badges: ['🥇 First Donation','🔥 7-Day Streak','💎 Consistent Giver','🌳 Tree Planter'],
-    history: [
-      {icon:'🌳',title:'Plant Trees — Rishikesh',date:'May 1, 2026',amt:'₹800'},
-      {icon:'🍱',title:'Feed the Hungry — Mumbai',date:'Apr 25, 2026',amt:'₹400'},
-      {icon:'🧺',title:'Essentials Kit — Pune',date:'Apr 18, 2026',amt:'₹500'},
-    ]
-  },
-  vikram: {
-    name: 'Vikram Khanna', initials: 'VK', city: 'Bangalore', since: 'Aug 2023', level: 'Level 4 — Impact Creator',
-    gradient: 'linear-gradient(135deg,#059669,#0891b2)',
-    stats: [
-      {n:'₹8,200',l:'Total Donated'},{n:'3,420',l:'XP Points'},{n:'67',l:'Donations'},{n:'3rd',l:'Rank'}
-    ],
-    badges: ['🥇 First Donation','🔥 7-Day Streak','💎 Consistent Giver'],
-    history: [
-      {icon:'🍱',title:'Feed the Hungry — Bangalore',date:'Apr 30, 2026',amt:'₹600'},
-      {icon:'🌳',title:'Plant Trees — Coorg',date:'Apr 22, 2026',amt:'₹500'},
-    ]
-  },
-  piyush: {
-    name: 'Piyush Singh', initials: 'PS', city: 'Lucknow', since: 'Jan 2024', level: 'Level 4 — Impact Creator',
-    gradient: 'linear-gradient(135deg,#7c3aed,#db2777)',
-    stats: [
-      {n:'₹4,850',l:'Total Donated'},{n:'1,840',l:'XP Points'},{n:'47',l:'Donations'},{n:'4th',l:'Rank'}
-    ],
-    badges: ['🥇 First Donation','🔥 7-Day Streak','💎 Consistent Giver','🌳 Tree Planter'],
-    history: [
-      {icon:'🍱',title:'Feed the Hungry — Lucknow',date:'May 1, 2026',amt:'₹100'},
-      {icon:'🌳',title:'Plant Trees — Dehradun',date:'Apr 22, 2026',amt:'₹500'},
-      {icon:'🧺',title:'Essentials Kit — Kanpur',date:'Apr 15, 2026',amt:'₹250'},
-    ]
-  },
-  neha: {
-    name: 'Neha Mishra', initials: 'NM', city: 'Jaipur', since: 'Sep 2023', level: 'Level 4 — Impact Creator',
-    gradient: 'linear-gradient(135deg,#059669,#0891b2)',
-    stats: [
-      {n:'₹4,200',l:'Total Donated'},{n:'1,680',l:'XP Points'},{n:'43',l:'Donations'},{n:'5th',l:'Rank'}
-    ],
-    badges: ['🥇 First Donation','🔥 7-Day Streak','💎 Consistent Giver'],
-    history: [
-      {icon:'🌳',title:'Plant Trees — Jaipur',date:'Apr 29, 2026',amt:'₹300'},
-      {icon:'🍱',title:'Feed the Hungry — Ajmer',date:'Apr 20, 2026',amt:'₹200'},
-    ]
-  },
-  arjun: {
-    name: 'Arjun Kumar', initials: 'AK', city: 'Chennai', since: 'Nov 2023', level: 'Level 4 — Impact Creator',
-    gradient: 'linear-gradient(135deg,#dc2626,#ea580c)',
-    stats: [
-      {n:'₹3,600',l:'Total Donated'},{n:'1,420',l:'XP Points'},{n:'38',l:'Donations'},{n:'6th',l:'Rank'}
-    ],
-    badges: ['🥇 First Donation','🌳 Tree Planter'],
-    history: [
-      {icon:'🧺',title:'Essentials Kit — Chennai',date:'Apr 28, 2026',amt:'₹500'},
-      {icon:'🍱',title:'Feed the Hungry — Coimbatore',date:'Apr 15, 2026',amt:'₹200'},
-    ]
-  }
-};
-
-/* ---- NGO PROFILES DATA ---- */
-const NGO_PROFILES = {
-  sewa: {
-    name: 'Sewa Foundation', icon: '🌾', location: '📍 Lucknow, Uttar Pradesh',
-    rating: '★★★★★ 4.9 (248 reviews)',
-    stats: [
-      {n:'312',l:'Tasks Done'},{n:'28',l:'Volunteers'},{n:'98',l:'Impact Score'},{n:'#1',l:'NGO Rank'}
-    ],
-    motive: 'Sewa Foundation was established in 2018 with a single mission: no child in Lucknow should sleep hungry. We believe that food security is the foundation of every other human right. Through our verified distribution network and community kitchens, we provide nutritious meals to underprivileged children and families across 12 localities in Lucknow. Every meal we serve is prepared hygienically, tracked digitally, and verified by our platform partner ServeMate. We are committed to zero wastage and 100% accountability.',
-    badges: ['🥇 Top Performer','🍱 Meals Champion','🔥 Consistent NGO','📹 Proof Leader','⭐ 5-Star Rated'],
-    volunteers: [
-      {initials:'RK',name:'Ravi Kumar'},{initials:'PM',name:'Pooja Mehta'},{initials:'AS',name:'Amit Singh'},
-      {initials:'DT',name:'Divya Tiwari'},{initials:'NK',name:'Neha Kumari'},{initials:'VG',name:'Vikash Gupta'},
-      {initials:'SY',name:'Sunita Yadav'},{initials:'MK',name:'Manoj Kashyap'},{initials:'RV',name:'Ritu Verma'},
-      {initials:'AT',name:'Ankit Tripathi'},{initials:'SK',name:'Shweta Kshatriya'},{initials:'PP',name:'Pradeep Pandey'},
-    ],
-    videos: [
-      {title:'500 Meals — Aliganj, Lucknow',date:'May 1, 2026',duration:'4:12',icon:'🍱'},
-      {title:'320 Meals — School Drive, Varanasi',date:'Apr 8, 2026',duration:'3:45',icon:'🍱'},
-      {title:'Weekend Relief Drive — Old Age Home',date:'Mar 15, 2026',duration:'5:20',icon:'🍱'},
-    ]
-  },
-  green: {
-    name: 'GreenIndia NGO', icon: '🌿', location: '📍 Dehradun, Uttarakhand',
-    rating: '★★★★★ 4.8 (192 reviews)',
-    stats: [
-      {n:'248',l:'Tasks Done'},{n:'19',l:'Volunteers'},{n:'95',l:'Impact Score'},{n:'#2',l:'NGO Rank'}
-    ],
-    motive: 'GreenIndia NGO was born from a simple observation — the Himalayan rivers are losing their green canopy at an alarming rate. Founded by a group of environmental engineers and forest activists in Dehradun, our mission is to restore native tree cover along degraded riverbanks and hillsides of Uttarakhand. We use geo-tagging technology to plant and monitor every single sapling. Our 12-month survival tracking ensures your contribution results in a living, growing tree — not just a planting event. We partner with local communities to ensure trees are adopted and cared for long-term.',
-    badges: ['🌳 Eco Champion','📍 GPS Verified','🔬 Science-Based','⭐ 5-Star Rated','♻️ Sustainability Award'],
-    volunteers: [
-      {initials:'AJ',name:'Aryan Joshi'},{initials:'KS',name:'Kavita Singh'},{initials:'RS',name:'Rohit Sharma'},
-      {initials:'PD',name:'Priya Dobhal'},{initials:'MS',name:'Manish Semwal'},{initials:'NG',name:'Nisha Gairola'},
-      {initials:'VN',name:'Vijay Negi'},{initials:'BC',name:'Bhavna Chauhan'},{initials:'SK',name:'Suresh Kumar'},
-    ],
-    videos: [
-      {title:'200 Saplings — Rispana Riverbank, Dehradun',date:'Apr 22, 2026',duration:'6:30',icon:'🌳'},
-      {title:'80 Saplings — Ganga Bank, Rishikesh',date:'Mar 21, 2026',duration:'4:15',icon:'🌳'},
-      {title:'150 Saplings — Mussoorie Hillside Drive',date:'Feb 14, 2026',duration:'7:02',icon:'🌳'},
-    ]
-  },
-  care: {
-    name: 'CareCrew India', icon: '💙', location: '📍 Kanpur, Uttar Pradesh',
-    rating: '★★★★☆ 4.6 (134 reviews)',
-    stats: [
-      {n:'186',l:'Tasks Done'},{n:'15',l:'Volunteers'},{n:'91',l:'Impact Score'},{n:'#3',l:'NGO Rank'}
-    ],
-    motive: 'CareCrew India focuses on dignity — the often-overlooked foundation of human wellbeing. We distribute essential hygiene and daily necessity kits to migrant workers, construction site families, and flood-affected communities across Kanpur and surrounding districts. Each kit is assembled by our trained volunteers, documented with photos and receipts, and distributed with dignity and respect. We believe that access to basic hygiene products can transform lives, reduce disease, and restore human dignity to those who need it most.',
-    badges: ['🧺 Essentials Leader','🧾 Receipts Verified','📸 Photo Proof','🆕 Rising Star'],
-    volunteers: [
-      {initials:'RP',name:'Ravi Prakash'},{initials:'SG',name:'Seema Gupta'},{initials:'AK',name:'Anil Kumar'},
-      {initials:'VT',name:'Vandana Tiwari'},{initials:'MG',name:'Mohit Gautam'},{initials:'PY',name:'Preeti Yadav'},
-      {initials:'NK',name:'Nikhil Khanna'},{initials:'RD',name:'Reena Dubey'},
-    ],
-    videos: [
-      {title:'150 Hygiene Kits — Migrant Camp, Kanpur',date:'Apr 15, 2026',duration:'3:55',icon:'🧺'},
-      {title:'80 Kits — Flood Relief, Unnao',date:'Mar 5, 2026',duration:'4:40',icon:'🧺'},
-    ]
-  },
-  udaan: {
-    name: 'Udaan Foundation', icon: '☀️', location: '📍 Agra, Uttar Pradesh',
-    rating: '★★★★☆ 4.5 (98 reviews)',
-    stats: [
-      {n:'142',l:'Tasks Done'},{n:'12',l:'Volunteers'},{n:'88',l:'Impact Score'},{n:'#4',l:'NGO Rank'}
-    ],
-    motive: 'Udaan Foundation believes every child deserves the chance to dream. Based in Agra, we work across meals, essentials, and community upliftment for children living near construction zones and low-income neighborhoods. Our name "Udaan" means flight — because we want to give every child the wings to rise. We are a young NGO, having joined ServeMate in 2025, but our commitment to transparency and verified impact has quickly earned us a rising reputation in the platform community.',
-    badges: ['🆕 Rising Star','🍱 Meals','🧺 Essentials','📹 Video Proof'],
-    volunteers: [
-      {initials:'AM',name:'Anand Mishra'},{initials:'SP',name:'Shikha Pandey'},{initials:'RJ',name:'Rajan Jain'},
-      {initials:'DC',name:'Deepa Chaurasia'},{initials:'PK',name:'Pankaj Kumar'},{initials:'NK',name:'Nita Kumari'},
-    ],
-    videos: [
-      {title:'120 Meals — Children Drive, Agra',date:'Apr 30, 2026',duration:'3:10',icon:'🍱'},
-      {title:'60 Essentials Kits — Fatehabad Area',date:'Apr 10, 2026',duration:'2:50',icon:'🧺'},
-    ]
-  },
-  mamta: {
-    name: 'Mamta Sewa Trust', icon: '🌸', location: '📍 Prayagraj, UP',
-    rating: '★★★★☆ 4.4 (76 reviews)',
-    stats: [
-      {n:'98',l:'Tasks Done'},{n:'10',l:'Volunteers'},{n:'85',l:'Impact Score'},{n:'#5',l:'NGO Rank'}
-    ],
-    motive: 'Mamta Sewa Trust was founded by a group of mothers who saw hunger and hardship in their own neighborhoods. Operating in Prayagraj, we combine meal distribution with essentials delivery — believing that a full stomach and clean hands together make the biggest difference. Our name "Mamta" means motherly love, and that is the spirit with which every volunteer delivers each meal and every kit. We are proud to be on ServeMate and to show our community exactly where every rupee goes.',
-    badges: ['🍱 Meals','🧺 Essentials','💪 Community Driven'],
-    volunteers: [
-      {initials:'SS',name:'Sunita Shukla'},{initials:'KV',name:'Kavita Verma'},{initials:'AP',name:'Asha Pandey'},
-      {initials:'RP',name:'Renu Pathak'},{initials:'MM',name:'Meena Mishra'},
-    ],
-    videos: [
-      {title:'200 Meals — Sangam Area, Prayagraj',date:'Apr 25, 2026',duration:'3:30',icon:'🍱'},
-      {title:'50 Essentials Kits — Civil Lines',date:'Apr 5, 2026',duration:'2:20',icon:'🧺'},
-    ]
-  }
-};
-
-function openUserProfile(id) {
-  const u = USER_PROFILES[id];
-  if (!u) return;
-  document.getElementById('upm-avatar').textContent = u.initials;
-  document.getElementById('upm-avatar').style.background = u.gradient;
-  document.getElementById('upm-name').textContent = u.name;
-  document.getElementById('upm-sub').textContent = '📍 ' + u.city + '   |   Member since ' + u.since + '   |   ⭐ ' + u.level;
-  document.getElementById('upm-stats').innerHTML = u.stats.map(s =>
-    `<div class="pm-stat"><div class="n">${s.n}</div><div class="l">${s.l}</div></div>`
-  ).join('');
-  document.getElementById('upm-badges').innerHTML = u.badges.map(b =>
-    `<span class="badge badge-blue" style="font-size:.78rem;">${b}</span>`
-  ).join('');
-  document.getElementById('upm-history').innerHTML = u.history.map(h =>
-    `<div class="pm-hist-item"><span class="pm-hist-icon">${h.icon}</span><div class="pm-hist-body"><div style="font-weight:600;">${h.title}</div><div style="font-size:.75rem;color:var(--text3);">${h.date}</div></div><span class="pm-hist-amt">${h.amt}</span></div>`
-  ).join('');
-  openModal('user-profile-modal');
+function openUserProfile() {
+  showToast('User profiles are loaded from live account data after login.');
 }
-
-function openNGOProfile(id) {
-  const n = NGO_PROFILES[id];
-  if (!n) return;
-  document.getElementById('npm-icon').textContent = n.icon;
-  document.getElementById('npm-name').textContent = n.name + ' ✓';
-  document.getElementById('npm-location').textContent = n.location;
-  document.getElementById('npm-rating').innerHTML = `<span style="color:var(--orange);font-size:.85rem;">${n.rating}</span>`;
-  document.getElementById('npm-stats').innerHTML = n.stats.map(s =>
-    `<div class="pm-stat"><div class="n">${s.n}</div><div class="l">${s.l}</div></div>`
-  ).join('');
-  document.getElementById('npm-motive').textContent = n.motive;
-  document.getElementById('npm-badges').innerHTML = n.badges.map(b =>
-    `<span class="badge badge-green" style="font-size:.78rem;">${b}</span>`
-  ).join('');
-  document.getElementById('npm-vol-count').textContent = n.volunteers.length;
-  document.getElementById('npm-volunteers').innerHTML = n.volunteers.map(v =>
-    `<div class="volunteer-chip"><div class="vc-avatar">${v.initials}</div>${v.name}</div>`
-  ).join('');
-  document.getElementById('npm-videos').innerHTML = n.videos.map(v =>
-    `<div class="video-proof-card">
-      <div class="vpc-thumb" onclick="showToast('▶ Playing: ${v.title}')">▶️</div>
-      <div class="vpc-body">
-        <div class="vpc-title">${v.icon} ${v.title}</div>
-        <div class="vpc-meta">📅 ${v.date} &nbsp;|&nbsp; ⏱ ${v.duration} &nbsp;|&nbsp; <span class="badge badge-green" style="font-size:.7rem;">✅ Verified</span></div>
-      </div>
-    </div>`
-  ).join('');
-  openModal('ngo-profile-modal');
+function openNGOProfile() {
+  showToast('NGO profiles are shown only for approved MongoDB records.');
 }
 
 // Close profile modals on overlay click
-document.getElementById('user-profile-modal').addEventListener('click', function(e){ if(e.target===this) closeModal('user-profile-modal'); });
-document.getElementById('ngo-profile-modal').addEventListener('click', function(e){ if(e.target===this) closeModal('ngo-profile-modal'); });
-
-
+const userProfileModal = document.getElementById('user-profile-modal');
+const ngoProfileModal = document.getElementById('ngo-profile-modal');
+if (userProfileModal) userProfileModal.addEventListener('click', function(e){ if(e.target===this) closeModal('user-profile-modal'); });
+if (ngoProfileModal) ngoProfileModal.addEventListener('click', function(e){ if(e.target===this) closeModal('ngo-profile-modal'); });
 // ===== MOBILE MENU =====
 function toggleMobileMenu() {
   const menu = document.getElementById('mobile-menu');
@@ -2071,3 +1432,10 @@ window.addEventListener('resize', () => {
 <script src="frontendIntegration.js"></script>
 </body>
 </html>
+
+
+
+
+
+
+

@@ -1,8 +1,6 @@
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
-const { User } = require("./models");
-
-const ADMIN_EMAIL = "th.piyushsingh2007@gmail.com";
+const { User, ADMIN_EMAIL } = require("./models");
 
 let jwtSecret = process.env.JWT_SECRET;
 if (!jwtSecret) {
@@ -32,7 +30,7 @@ async function authMiddleware(req, res, next) {
     req.user = jwt.verify(auth.slice(7), jwtSecret);
     return next();
   } catch (err) {
-    return res.status(401).json({ error: "Invalid or expired token" });
+    return res.status(401).json({ error: "Invalid or expired token", code: "TOKEN_EXPIRED" });
   }
 }
 

@@ -36,7 +36,12 @@ app.use(
   })
 );
 
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({
+  limit: "10mb",
+  verify: (req, res, buf) => {
+    req.rawBody = buf.toString("utf8");
+  },
+}));
 app.use(express.urlencoded({ extended: true }));
 
 app.get("/api/health", (req, res) => {
@@ -111,45 +116,14 @@ mongoose.connection.on("reconnected", () => {
 });
 
 async function seedDatabase() {
-  const { Cause, User } = require("./models");
+  const { User, Badge, badgeCatalog } = require("./models");
   const bcrypt = require("bcryptjs");
 
-  const causeCount = await Cause.countDocuments();
-  if (causeCount === 0) {
-    await Cause.insertMany([
-      {
-        title: "Meals for All",
-        description: "Provide nutritious meals to underprivileged children and elderly. Every INR 10 feeds one person.",
-        icon: "meals",
-        category: "meals",
-        goal: 100000,
-        raised: 73240,
-        contributors: 2341,
-        impactPerRupee: "INR 10 feeds 1 person for a day",
-      },
-      {
-        title: "Tree Plantation Drive",
-        description: "Plant trees across urban wastelands and barren hillsides. INR 50 plants and nurtures one tree for a full year.",
-        icon: "trees",
-        category: "trees",
-        goal: 100000,
-        raised: 58000,
-        contributors: 1087,
-        impactPerRupee: "INR 50 = 1 tree planted and maintained",
-      },
-      {
-        title: "Daily Essentials Kit",
-        description: "Distribute hygiene kits and essential supplies to families in flood-affected zones.",
-        icon: "essentials",
-        category: "essentials",
-        goal: 100000,
-        raised: 41500,
-        contributors: 892,
-        impactPerRupee: "INR 100 = 1 complete hygiene kit",
-      },
-    ]);
-    console.log("[seed] Causes seeded");
-  }
+  await Badge.bulkWrite(
+    badgeCatalog.map((badge) => ({
+      updateOne: { filter: { key: badge.key }, update: { $setOnInsert: badge }, upsert: true },
+    }))
+  );
 
   const adminExists = await User.findOne({ email: ADMIN_EMAIL });
   if (!adminExists) {
@@ -167,7 +141,9 @@ async function seedDatabase() {
     });
     console.log(`[seed] Admin user created: ${ADMIN_EMAIL}`);
   } else if (adminExists.role !== "admin") {
-    console.warn(`[seed] ${ADMIN_EMAIL} exists but is not an admin. Update this user role manually before using admin APIs.`);
+    adminExists.role = "admin";
+    await adminExists.save();
+    console.log(`[seed] Admin privileges repaired for ${ADMIN_EMAIL}`);
   }
 }
 
