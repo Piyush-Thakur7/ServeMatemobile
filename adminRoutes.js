@@ -1,102 +1,223 @@
-const express = require('express');
-const router = express.Router();
-const { User, NGO, Donation, TokenRequest } = require('./models');
+const express  = require("express");
+const jwt      = require("jsonwebtoken");
+const { User, NGO, Cause, Donation, Transparency, Contact } = require("./models");
 
-const authenticate = (req, res, next) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+const router = express.Router();
+const JWT_SECRET = process.env.JWT_SECRET || "servemate_secret";
+
+// ─── ADMIN AUTH MIDDLEWARE ────────────────────────────────────────────────────
+const adminOnly = (req, res, next) => {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith("Bearer "))
+    return res.status(401).json({ error: "No token" });
   try {
-    const jwt = require('jsonwebtoken');
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (decoded.role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
-    req.userId = decoded.userId;
+    const decoded = jwt.verify(auth.split(" ")[1], JWT_SECRET);
+    if (decoded.role !== "admin")
+      return res.status(403).json({ error: "Admin only" });
+    req.user = decoded;
     next();
-  } catch (err) {
-    res.status(401).json({ error: 'Invalid token' });
+  } catch {
+    res.status(401).json({ error: "Invalid token" });
   }
 };
 
-router.get('/stats', authenticate, async (req, res) => {
+// ─── NGO MANAGEMENT ──────────────────────────────────────────────────────────
+
+// GET /api/admin/ngos/pending  — NGOs awaiting verification
+router.get("/ngos/pending", adminOnly, async (req, res) => {
   try {
-    const totalUsers = await User.countDocuments();
-    const totalDonations = await Donation.countDocuments();
-    const totalTokens = await User.aggregate([ { $group: { _id: null, sum: { $sum: "$tokens" } } } ]);
-    const pendingTokens = await TokenRequest.countDocuments({ status: 'Pending' });
-    res.json({
-      users: totalUsers,
-      donations: totalDonations,
-      tokens: totalTokens[0]?.sum || 0,
-      pendingRequests: pendingTokens
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-router.get('/token-requests', authenticate, async (req, res) => {
-  try {
-    const requests = await TokenRequest.find({ status: 'Pending' }).populate('userId');
-    res.json(requests);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-router.post('/approve-tokens/:id', authenticate, async (req, res) => {
-  try {
-    const request = await TokenRequest.findById(req.params.id);
-    if (!request || request.status !== 'Pending') return res.status(400).json({ error: 'Invalid request' });
-
-    const user = await User.findById(request.userId);
-    user.tokens += request.amountRequested;
-
-    request.status = 'Approved';
-    request.processedAt = Date.now();
-
-    await user.save();
-    await request.save();
-    res.json({ message: 'Tokens approved and added to user account!' });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-router.post('/reject-tokens/:id', authenticate, async (req, res) => {
-  try {
-    const request = await TokenRequest.findById(req.params.id);
-    request.status = 'Rejected';
-    await request.save();
-    res.json({ message: 'Token request rejected.' });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-router.get('/users', authenticate, async (req, res) => {
-  try {
-    const users = await User.find().sort({ xp: -1 });
-    res.json(users);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-router.get('/ngos', authenticate, async (req, res) => {
-  try {
-    const ngos = await NGO.find();
+    const ngos = await NGO.find({ verified: false }).select("-password").sort({ createdAt: -1 });
     res.json(ngos);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.patch('/verify-ngo/:id', authenticate, async (req, res) => {
+// GET /api/admin/ngos/all
+router.get("/ngos/all", adminOnly, async (req, res) => {
   try {
-    const ngo = await NGO.findByIdAndUpdate(req.params.id, { isVerified: true }, { new: true });
-    res.json({ message: 'NGO verified successfully', ngo });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
+    const ngos = await NGO.find().select("-password").sort({ createdAt: -1 });
+    res.json(ngos);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PATCH /api/admin/ngos/:id/verify  — approve an NGO
+router.patch("/ngos/:id/verify", adminOnly, async (req, res) => {
+  try {
+    const ngo = await NGO.findByIdAndUpdate(
+      req.params.id,
+      { verified: true, verifiedAt: new Date() },
+      { new: true }
+    ).select("-password");
+    if (!ngo) return res.status(404).json({ error: "NGO not found" });
+    res.json({ message: "NGO verified", ngo });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// DELETE /api/admin/ngos/:id  — reject/remove NGO
+router.delete("/ngos/:id", adminOnly, async (req, res) => {
+  try {
+    await NGO.findByIdAndDelete(req.params.id);
+    res.json({ message: "NGO removed" });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── CAUSE MANAGEMENT ─────────────────────────────────────────────────────────
+
+// POST /api/admin/causes  — create a new cause
+router.post("/causes", adminOnly, async (req, res) => {
+  try {
+    const { title, description, icon, category, goal, impactPerRupee, assignedNgo } = req.body;
+    if (!title || !description || !category || !goal)
+      return res.status(400).json({ error: "Required fields missing" });
+
+    const cause = await Cause.create({
+      title, description, icon, category,
+      goal: Number(goal), impactPerRupee, assignedNgo: assignedNgo || null
+    });
+    res.status(201).json(cause);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PATCH /api/admin/causes/:id  — update cause
+router.patch("/causes/:id", adminOnly, async (req, res) => {
+  try {
+    const cause = await Cause.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!cause) return res.status(404).json({ error: "Cause not found" });
+    res.json(cause);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// DELETE /api/admin/causes/:id
+router.delete("/causes/:id", adminOnly, async (req, res) => {
+  try {
+    await Cause.findByIdAndDelete(req.params.id);
+    res.json({ message: "Cause deleted" });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── DONATION MANAGEMENT ──────────────────────────────────────────────────────
+
+// GET /api/admin/donations  — all donations
+router.get("/donations", adminOnly, async (req, res) => {
+  try {
+    const { status, page = 1, limit = 20 } = req.query;
+    const filter = status ? { status } : {};
+    const donations = await Donation.find(filter)
+      .populate("user",  "name email")
+      .populate("cause", "title")
+      .populate("ngo",   "name")
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(Number(limit));
+    const total = await Donation.countDocuments(filter);
+    res.json({ donations, total });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PATCH /api/admin/donations/:id/complete  — mark donation complete + add proof
+router.patch("/donations/:id/complete", adminOnly, async (req, res) => {
+  try {
+    const { proofVideo, proofNote, location } = req.body;
+    const donation = await Donation.findByIdAndUpdate(
+      req.params.id,
+      { status: "completed", proofVideo, proofNote, location },
+      { new: true }
+    ).populate("cause ngo");
+
+    if (!donation) return res.status(404).json({ error: "Donation not found" });
+
+    // Add to transparency log
+    await Transparency.create({
+      donation:    donation._id,
+      ngo:         donation.ngo?._id,
+      cause:       donation.cause?._id,
+      description: proofNote || `${donation.cause?.title} completed`,
+      proofVideo,
+      location,
+      amount:      donation.amount,
+      date:        new Date()
+    });
+
+    // Update NGO stats
+    if (donation.ngo) {
+      await NGO.findByIdAndUpdate(donation.ngo._id, {
+        $inc: { tasksCompleted: 1, impactScore: Math.floor(donation.amount / 10) }
+      });
+    }
+
+    res.json({ message: "Donation marked complete & transparency log created", donation });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PATCH /api/admin/donations/:id/verify  — final verify (user can now see proof)
+router.patch("/donations/:id/verify", adminOnly, async (req, res) => {
+  try {
+    const donation = await Donation.findByIdAndUpdate(
+      req.params.id,
+      { status: "verified", verifiedAt: new Date() },
+      { new: true }
+    );
+    if (!donation) return res.status(404).json({ error: "Donation not found" });
+    res.json({ message: "Donation verified", donation });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── CONTACT MESSAGES ─────────────────────────────────────────────────────────
+
+// GET /api/admin/contacts
+router.get("/contacts", adminOnly, async (req, res) => {
+  try {
+    const messages = await Contact.find().sort({ createdAt: -1 });
+    res.json(messages);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PATCH /api/admin/contacts/:id/read
+router.patch("/contacts/:id/read", adminOnly, async (req, res) => {
+  try {
+    await Contact.findByIdAndUpdate(req.params.id, { read: true });
+    res.json({ message: "Marked as read" });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── PLATFORM OVERVIEW ────────────────────────────────────────────────────────
+
+// GET /api/admin/overview
+router.get("/overview", adminOnly, async (req, res) => {
+  try {
+    const [users, ngos, donations, pendingNgos, unreadMessages] = await Promise.all([
+      User.countDocuments(),
+      NGO.countDocuments({ verified: true }),
+      Donation.aggregate([
+        { $group: { _id: null, total: { $sum: "$amount" }, count: { $sum: 1 } } }
+      ]),
+      NGO.countDocuments({ verified: false }),
+      Contact.countDocuments({ read: false })
+    ]);
+
+    res.json({
+      totalUsers:    users,
+      verifiedNGOs:  ngos,
+      totalDonated:  donations[0]?.total || 0,
+      totalDonations:donations[0]?.count || 0,
+      pendingNGOs:   pendingNgos,
+      unreadMessages
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── NGO VOLUNTEER MANAGEMENT (NGO manages own volunteers) ────────────────────
+
+// POST /api/admin/ngos/:id/volunteers  — add volunteer to NGO
+router.post("/ngos/:id/volunteers", adminOnly, async (req, res) => {
+  try {
+    const { name, email, phone } = req.body;
+    const ngo = await NGO.findByIdAndUpdate(
+      req.params.id,
+      { $push: { volunteers: { name, email, phone } } },
+      { new: true }
+    ).select("-password");
+    res.json({ message: "Volunteer added", ngo });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 module.exports = router;
