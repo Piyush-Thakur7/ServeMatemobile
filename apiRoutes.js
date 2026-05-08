@@ -1,135 +1,289 @@
-const express = require('express');
+const express  = require("express");
+const { User, NGO, Cause, Donation, Transparency, Contact } = require("./models");
+const { authMiddleware } = require("./authRoutes");
+
 const router = express.Router();
-const { User, Donation, NGO, Task } = require('./models');
 
-// Middleware to verify token
-const authenticate = (req, res, next) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Unauthorized' });
-  try {
-    const jwt = require('jsonwebtoken');
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.userId = decoded.userId;
-    next();
-  } catch (err) {
-    res.status(401).json({ error: 'Invalid token' });
-  }
-};
+// ════════════════════════════════════════════════════════════════════════════
+//  CAUSES
+// ════════════════════════════════════════════════════════════════════════════
 
-// User Profile
-router.get('/profile', authenticate, async (req, res) => {
+// GET /api/causes  — all active causes (for homepage cards)
+router.get("/causes", async (req, res) => {
   try {
-    const user = await User.findById(req.userId);
-    res.json(user);
+    const causes = await Cause.find({ active: true })
+      .populate("assignedNgo", "name verified rating")
+      .sort({ raised: -1 });
+    res.json(causes);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Make a Donation (Updated for Token Economy)
-router.post('/donate', authenticate, async (req, res) => {
+// GET /api/causes/:id
+router.get("/causes/:id", async (req, res) => {
   try {
-    const { amount, cause, ngoId } = req.body;
-    const user = await User.findById(req.userId);
+    const cause = await Cause.findById(req.params.id)
+      .populate("assignedNgo", "name verified rating tasksCompleted");
+    if (!cause) return res.status(404).json({ error: "Cause not found" });
+    res.json(cause);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
-    if (!user || user.tokens < amount) {
-      return res.status(400).json({ error: 'Insufficient tokens. Please acquire more tokens!' });
-    }
+// ════════════════════════════════════════════════════════════════════════════
+//  DONATIONS
+// ════════════════════════════════════════════════════════════════════════════
 
-    const donation = new Donation({ userId: req.userId, amount, cause, ngoId });
-    await donation.save();
+// POST /api/donate  — authenticated user donates to a cause
+router.post("/donate", authMiddleware, async (req, res) => {
+  try {
+    const { causeId, amount } = req.body;
+    if (!causeId || !amount || amount < 10)
+      return res.status(400).json({ error: "Cause and minimum ₹10 required" });
 
-    // Deduct Tokens and Add XP
-    user.tokens -= amount;
-    user.totalDonated += amount;
-    user.xp += 10;
+    const cause = await Cause.findById(causeId);
+    if (!cause || !cause.active)
+      return res.status(404).json({ error: "Cause not found or inactive" });
 
-    // Level calculation logic
-    if (user.xp >= 5000) user.level = 'Legend';
-    else if (user.xp >= 2500) user.level = 'Champion';
-    else if (user.xp >= 1200) user.level = 'Impact Creator';
-    else if (user.xp >= 600) user.level = 'Active Supporter';
-    else if (user.xp >= 200) user.level = 'Contributor';
-    else user.level = 'Beginner';
+    // XP earned = 1 XP per ₹1 donated (min 10)
+    const xpEarned = Math.floor(amount);
+
+    // Create donation record
+    const donation = await Donation.create({
+      user:   req.user.id,
+      cause:  causeId,
+      ngo:    cause.assignedNgo,
+      amount: Number(amount),
+      xpEarned,
+      status: "pending",
+      location: cause.location || ""
+    });
+
+    // Update cause stats
+    await Cause.findByIdAndUpdate(causeId, {
+      $inc: { raised: amount, contributors: 1 }
+    });
+
+    // Update user stats + XP + badges
+    const user = await User.findById(req.user.id);
+    user.totalDonated  += Number(amount);
+    user.donationCount += 1;
+    user.xp            += xpEarned;
+    user.lastDonation   = new Date();
+
+    // Award badges
+    if (user.donationCount === 1 && !user.badges.includes("First Donation"))
+      user.badges.push("First Donation");
+    if (user.donationCount >= 10 && !user.badges.includes("Consistent Giver"))
+      user.badges.push("Consistent Giver");
+    if (user.donationCount >= 100 && !user.badges.includes("Century Club"))
+      user.badges.push("Century Club");
+    if (user.xp >= 5000 && !user.badges.includes("Impact Creator"))
+      user.badges.push("Impact Creator");
 
     await user.save();
-    res.json({ message: 'Donation successful!', currentTokens: user.tokens, xpEarned: 10 });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
 
-// Request Tokens (Simulated payment via UPI screenshot)
-router.post('/request-tokens', authenticate, async (req, res) => {
-  try {
-    const { amount, screenshotUrl } = req.body;
-    const request = new TokenRequest({
-      userId: req.userId,
-      amountRequested: amount,
-      screenshotUrl: screenshotUrl
+    // If NGO assigned, update received amount
+    if (cause.assignedNgo) {
+      await NGO.findByIdAndUpdate(cause.assignedNgo, {
+        $inc: { totalReceived: amount }
+      });
+    }
+
+    res.status(201).json({
+      message: "Donation successful!",
+      donation: {
+        id: donation._id,
+        amount: donation.amount,
+        status: donation.status,
+        xpEarned,
+      },
+      user: {
+        xp: user.xp,
+        level: user.level,
+        badges: user.badges,
+        totalDonated: user.totalDonated,
+        donationCount: user.donationCount
+      }
     });
-    await request.save();
-    res.json({ message: 'Token request submitted! Admin will verify your payment.' });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-// Get User Token Status
-router.get('/token-status', authenticate, async (req, res) => {
-  try {
-    const requests = await TokenRequest.find({ userId: req.userId }).sort({ createdAt: -1 });
-    res.json(requests);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Get User Donations History
-router.get('/donations', authenticate, async (req, res) => {
+// GET /api/donations/history  — user's own donation history
+router.get("/donations/history", authMiddleware, async (req, res) => {
   try {
-    const history = await Donation.find({ userId: req.userId }).sort({ date: -1 }).populate('ngoId');
-    res.json(history);
+    const donations = await Donation.find({ user: req.user.id })
+      .populate("cause", "title icon category")
+      .populate("ngo", "name location")
+      .sort({ createdAt: -1 });
+    res.json(donations);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Get all NGOs
-router.get('/ngos', async (req, res) => {
+// ════════════════════════════════════════════════════════════════════════════
+//  TRANSPARENCY LOG
+// ════════════════════════════════════════════════════════════════════════════
+
+// GET /api/transparency  — public feed of all completed works
+router.get("/transparency", async (req, res) => {
   try {
-    const ngos = await NGO.find().sort({ impactScore: -1 });
+    const { cause, ngo, page = 1, limit = 10 } = req.query;
+    const filter = {};
+    if (cause) filter.cause = cause;
+    if (ngo)   filter.ngo   = ngo;
+
+    const logs = await Transparency.find(filter)
+      .populate("ngo",   "name location verified rating")
+      .populate("cause", "title icon category")
+      .sort({ date: -1 })
+      .skip((page - 1) * limit)
+      .limit(Number(limit));
+
+    const total = await Transparency.countDocuments(filter);
+    res.json({ logs, total, page: Number(page), pages: Math.ceil(total / limit) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+//  NGO PUBLIC DIRECTORY
+// ════════════════════════════════════════════════════════════════════════════
+
+// GET /api/ngos  — list verified NGOs sorted by rank
+router.get("/ngos", async (req, res) => {
+  try {
+    const ngos = await NGO.find({ verified: true })
+      .select("-password -volunteers")
+      .sort({ impactScore: -1 });
     res.json(ngos);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Get NGO Profile
-router.get('/ngo/:id', async (req, res) => {
+// GET /api/ngos/:id
+router.get("/ngos/:id", async (req, res) => {
   try {
-    const ngo = await NGO.findById(req.params.id);
-    res.json(ngo);
-  } catch (err) {
-    res.status(404).json({ error: 'NGO not found' });
-  }
-});
+    const ngo = await NGO.findById(req.params.id).select("-password");
+    if (!ngo || !ngo.verified)
+      return res.status(404).json({ error: "NGO not found" });
 
-// Leaderboard - Donors
-router.get('/leaderboard/donors', async (req, res) => {
-  try {
-    const topDonors = await User.find().sort({ xp: -1 }).limit(10);
-    res.json(topDonors);
+    // Get recent transparency logs for this NGO
+    const logs = await Transparency.find({ ngo: req.params.id })
+      .populate("cause", "title icon")
+      .sort({ date: -1 })
+      .limit(5);
+
+    res.json({ ngo, recentWork: logs });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Leaderboard - NGOs
-router.get('/leaderboard/ngos', async (req, res) => {
+// ════════════════════════════════════════════════════════════════════════════
+//  LEADERBOARD
+// ════════════════════════════════════════════════════════════════════════════
+
+// GET /api/leaderboard/donors
+router.get("/leaderboard/donors", async (req, res) => {
   try {
-    const topNGOs = await NGO.find().sort({ impactScore: -1 }).limit(10);
-    res.json(topNGOs);
+    const donors = await User.find({ donationCount: { $gt: 0 } })
+      .select("name xp level donationCount totalDonated badges")
+      .sort({ xp: -1 })
+      .limit(20);
+    res.json(donors);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/leaderboard/ngos
+router.get("/leaderboard/ngos", async (req, res) => {
+  try {
+    const ngos = await NGO.find({ verified: true })
+      .select("name impactScore tasksCompleted rating onTimeRate areaOfWork")
+      .sort({ impactScore: -1 })
+      .limit(20);
+    res.json(ngos);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+//  USER DASHBOARD
+// ════════════════════════════════════════════════════════════════════════════
+
+// GET /api/dashboard  — full dashboard data for logged-in user
+router.get("/dashboard", authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select("-password");
+    const donations = await Donation.find({ user: req.user.id })
+      .populate("cause", "title icon category")
+      .populate("ngo", "name location")
+      .sort({ createdAt: -1 })
+      .limit(10);
+
+    // XP to next level
+    const xpThresholds = { Beginner: 500, Contributor: 2000, "Active Supporter": 5000 };
+    const nextXp = xpThresholds[user.level] || null;
+
+    res.json({
+      user,
+      recentDonations: donations,
+      nextLevelXp: nextXp,
+      xpProgress: nextXp ? Math.round((user.xp / nextXp) * 100) : 100
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+//  CONTACT
+// ════════════════════════════════════════════════════════════════════════════
+
+// POST /api/contact
+router.post("/contact", async (req, res) => {
+  try {
+    const { name, email, message } = req.body;
+    if (!name || !email || !message)
+      return res.status(400).json({ error: "All fields required" });
+    await Contact.create({ name, email, message });
+    res.json({ message: "Message sent! We will respond within 24 hours." });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+//  STATS (for hero section)
+// ════════════════════════════════════════════════════════════════════════════
+
+// GET /api/stats
+router.get("/stats", async (req, res) => {
+  try {
+    const [totalDonated, livesImpacted, verifiedNGOs, totalDonations] =
+      await Promise.all([
+        User.aggregate([{ $group: { _id: null, total: { $sum: "$totalDonated" } } }]),
+        Transparency.countDocuments(),
+        NGO.countDocuments({ verified: true }),
+        Donation.countDocuments({ status: "verified" })
+      ]);
+
+    res.json({
+      totalDonated:  totalDonated[0]?.total || 0,
+      livesImpacted: livesImpacted * 10,   // approx 10 lives per task
+      verifiedNGOs,
+      totalDonations
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
