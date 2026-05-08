@@ -124,7 +124,7 @@ const tokenTransactionSchema = new mongoose.Schema(
     currency: { type: String, default: "INR" },
     type: {
       type: String,
-      enum: ["purchase", "contribution", "admin_adjustment", "refund"],
+      enum: ["purchase", "spend", "reward", "bonus", "contribution", "admin_adjustment", "refund"],
       required: true,
     },
     paymentStatus: {
@@ -135,7 +135,7 @@ const tokenTransactionSchema = new mongoose.Schema(
     },
     provider: { type: String, enum: ["razorpay", "manual", "system"], default: "manual" },
     providerOrderId: { type: String, index: true },
-    providerPaymentId: { type: String },
+    providerPaymentId: { type: String, index: true },
     providerSignature: { type: String },
     metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
     createdAt: { type: Date, default: Date.now },

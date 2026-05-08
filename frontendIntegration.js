@@ -63,6 +63,37 @@
   const number = (value) => Number(value || 0).toLocaleString("en-IN");
   const initials = (name) => String(name || "SM").split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0].toUpperCase()).join("") || "SM";
   const toast = (message) => window.showToast ? window.showToast(message) : alert(message);
+  const publicNav = [
+    { label: "Home", page: "home" },
+    { label: "What is ServeMate", page: "about" },
+    { label: "Transparency", page: "transparency" },
+    { label: "NGOs", page: "ngos" },
+    { label: "Leaderboard", page: "leaderboard" },
+    { label: "Contact", page: "contact" },
+  ];
+
+  function navItems(user) {
+    const items = [...publicNav];
+    if (!user) {
+      return [
+        ...items,
+        { label: "Login", action: "openAuthModal()" },
+        { label: "Register", action: "ServeMATE.openRegister()", cta: true },
+      ];
+    }
+    items.push({ label: "Dashboard", page: "dashboard" });
+    if (user.role === "admin") items.push({ label: "Admin Panel", page: "admin", cta: true });
+    items.push({ label: "Profile", page: "dashboard" }, { label: "Logout", action: "ServeMATE.logout()" });
+    return items;
+  }
+
+  function renderNavButton(item, mobile = false) {
+    const classes = mobile ? (item.cta ? ` class="cta"` : "") : ` class="nav-btn${item.cta ? " btn-nav-cta" : ""}"`;
+    const action = item.page ? `${mobile ? "mobileNav" : "showPage"}('${item.page}')` : item.action;
+    return mobile
+      ? `<button data-sm-nav${classes} onclick="${action}">${esc(item.label)}</button>`
+      : `<li data-sm-nav><button${classes} onclick="${action}">${esc(item.label)}</button></li>`;
+  }
 
   function emptyState(title, body) {
     return `<div class="card sm-empty"><h4>${esc(title)}</h4><p>${esc(body)}</p></div>`;
@@ -72,32 +103,12 @@
     const user = savedUser();
     const nav = document.querySelector(".nav-links");
     if (nav) {
-      const authItems = nav.querySelectorAll("[data-sm-auth]");
-      authItems.forEach((item) => item.remove());
-      const login = nav.querySelector("[onclick='openAuthModal()']")?.closest("li");
-      if (login) login.remove();
-      const dashboard = nav.querySelector("[onclick=\"showPage('dashboard')\"]")?.closest("li");
-      if (!user && dashboard) dashboard.style.display = "none";
-      if (user && dashboard) dashboard.style.display = "";
-      nav.insertAdjacentHTML("beforeend", user ? `
-        <li data-sm-auth><button class="nav-btn" onclick="showPage('dashboard')">Dashboard</button></li>
-        <li data-sm-auth><button class="nav-btn" onclick="showPage('dashboard')">Profile</button></li>
-        ${user.role === "admin" ? `<li data-sm-auth><button class="nav-btn btn-nav-cta" onclick="showPage('admin')">Admin</button></li>` : ""}
-        <li data-sm-auth><button class="nav-btn" onclick="ServeMATE.logout()">Logout</button></li>
-      ` : `
-        <li data-sm-auth><button class="nav-btn" onclick="openAuthModal()">Login</button></li>
-        <li data-sm-auth><button class="nav-btn btn-nav-cta" onclick="openAuthModal();switchAuthTab('register', document.querySelector('#auth-modal .tab-btn:nth-child(2)'))">Register</button></li>
-      `);
+      nav.innerHTML = navItems(user).map((item) => renderNavButton(item)).join("");
     }
 
     const mobile = document.getElementById("mobile-menu");
     if (mobile) {
-      mobile.querySelectorAll("[data-sm-auth]").forEach((item) => item.remove());
-      mobile.insertAdjacentHTML("beforeend", user ? `
-        <button data-sm-auth onclick="mobileNav('dashboard')" class="cta">Dashboard</button>
-        ${user.role === "admin" ? `<button data-sm-auth onclick="mobileNav('admin')">Admin</button>` : ""}
-        <button data-sm-auth onclick="ServeMATE.logout()">Logout</button>
-      ` : `<button data-sm-auth onclick="openAuthModal();closeMobileMenu()">Login / Register</button>`);
+      mobile.innerHTML = navItems(user).map((item) => renderNavButton(item, true)).join("");
     }
   }
 
@@ -163,35 +174,50 @@
 
   async function loadCauses() {
     const grid = document.getElementById("causes-grid");
-    if (!grid) return;
+    const causeSelect = document.getElementById("donate-cause");
+    if (!grid && !causeSelect) return;
     try {
       const causes = await request("/causes");
+      if (causeSelect) {
+        causeSelect.innerHTML = causes.length
+          ? causes.map((cause) => `<option value="${esc(cause._id)}">${esc(cause.title)}</option>`).join("")
+          : `<option value="">No active causes yet</option>`;
+        causeSelect.disabled = !causes.length;
+      }
+      if (!grid) return;
       grid.innerHTML = causes.length ? causes.map((cause) => {
+        const hasActivity = Number(cause.raised || 0) > 0 || Number(cause.contributors || 0) > 0;
         const pct = cause.goal ? Math.min(Math.round(((cause.raised || 0) / cause.goal) * 100), 100) : 0;
         return `
           <div class="card cause-card">
             <div class="cause-icon">${esc(cause.icon || "SM")}</div>
             <h3 style="font-size:1.15rem;font-weight:700;margin-bottom:.35rem;">${esc(cause.title)}</h3>
             <p style="font-size:.85rem;color:var(--text2);margin-bottom:1rem;line-height:1.6;">${esc(cause.description)}</p>
-            <div class="cause-meta"><span>Token progress</span><span class="cause-raised">${number(cause.raised || 0)} tokens</span></div>
-            <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+            ${hasActivity ? `
+              <div class="cause-meta"><span>Community activity</span><span class="cause-raised">${number(cause.raised || 0)} tokens</span></div>
+              <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+            ` : `<div class="sm-empty" style="padding:1rem;margin:0 0 1rem;"><h4>No community activity yet</h4><p>Be the first supporter for this cause.</p></div>`}
             <div class="cause-footer">
-              <span style="font-size:.8rem;color:var(--text2);">${number(cause.contributors || 0)} contributors</span>
-              <button class="btn btn-primary" onclick="openDonateModal('${esc(cause.category || cause._id)}')">Use Tokens</button>
+              <span style="font-size:.8rem;color:var(--text2);">${hasActivity ? `${number(cause.contributors || 0)} contributors` : "No contributors yet"}</span>
+              <button class="btn btn-primary" onclick="openDonateModal('${esc(cause._id)}')">Use Tokens</button>
             </div>
           </div>
         `;
-      }).join("") : emptyState("No active causes yet", "Admin-created causes will appear here without hardcoded totals.");
+      }).join("") : emptyState("No active causes yet", "Reviewed causes will appear here when they are ready.");
     } catch (err) {
-      grid.innerHTML = emptyState("Causes unavailable", err.message);
+      if (grid) grid.innerHTML = emptyState("Causes unavailable", err.message);
+      if (causeSelect) {
+        causeSelect.innerHTML = `<option value="">Causes unavailable</option>`;
+        causeSelect.disabled = true;
+      }
     }
   }
 
   function clearFakeSections() {
     const donorRows = document.getElementById("lb-donors");
     const ngoRows = document.getElementById("lb-ngos");
-    if (donorRows) donorRows.innerHTML = emptyState("Leaderboard loading", "Real rankings will appear after MongoDB data loads.");
-    if (ngoRows) ngoRows.innerHTML = emptyState("NGO leaderboard loading", "Only approved NGOs from MongoDB are shown here.");
+    if (donorRows) donorRows.innerHTML = emptyState("Leaderboard loading", "Real rankings will appear after verified activity loads.");
+    if (ngoRows) ngoRows.innerHTML = emptyState("NGO leaderboard loading", "Only approved NGOs are shown here.");
 
     const ngoGrid = document.querySelector("#page-ngos .grid-3");
     if (ngoGrid) ngoGrid.innerHTML = emptyState("No approved NGOs yet", "Approved NGO applications will appear here after admin review.");
@@ -236,7 +262,7 @@
         const change = card.querySelector(".change");
         if (label) label.textContent = values[index]?.[0] || "";
         if (valueEl) valueEl.textContent = values[index]?.[1] || "0";
-        if (change) change.textContent = "From live MongoDB data";
+        if (change) change.textContent = "From real activity";
       });
 
       const activityCard = document.querySelector("#dtab-overview .grid-2 .card:first-child > div");
@@ -278,7 +304,7 @@
     try {
       const rows = await request(`/leaderboard/${type}`);
       if (!Array.isArray(rows) || rows.length === 0) {
-        target.innerHTML = emptyState("No rankings yet", "Rankings appear after real token activity exists in MongoDB.");
+        target.innerHTML = emptyState("No rankings yet", "Rankings appear after real token activity exists.");
         return;
       }
       target.innerHTML = rows.map((row, index) => {
@@ -313,7 +339,7 @@
         <div class="card ngo-card">
           <div class="ngo-rank">#${index + 1}</div>
           <div class="ngo-avatar">${initials(ngo.ngoName || ngo.name)}</div>
-          <div class="ngo-name">${esc(ngo.ngoName || ngo.name)} <span class="verified-tick" title="Admin approved">âœ“</span></div>
+          <div class="ngo-name">${esc(ngo.ngoName || ngo.name)} <span class="verified-tick" title="Approved NGO">Verified</span></div>
           <div style="font-size:.82rem;color:var(--text2);margin-bottom:.5rem;">${esc(ngo.location || "")}</div>
           <p style="font-size:.85rem;color:var(--text2);line-height:1.6;">${esc(ngo.description || "No public description yet.")}</p>
           <div class="ngo-stat-row">
@@ -341,14 +367,14 @@
             <div>
               <div class="section-label">Admin</div>
               <h2 class="section-title">ServeMATE Control Center</h2>
-              <p class="section-sub">Moderate NGOs, users, transactions, messages, badges, and platform analytics from live MongoDB records.</p>
+              <p class="section-sub">Moderate NGOs, users, transactions, messages, badges, and platform analytics from live platform activity.</p>
             </div>
             <button class="btn btn-primary" onclick="ServeMATE.reloadAdmin()">Refresh</button>
           </div>
         </section>
         <section style="padding-top:2rem;">
           <div class="container">
-            <div id="admin-root">${emptyState("Loading admin", "Fetching live platform records.")}</div>
+            <div id="admin-root">${emptyState("Loading admin", "Fetching live platform activity.")}</div>
           </div>
         </section>
       </div>
@@ -370,7 +396,7 @@
       return;
     }
     try {
-      root.innerHTML = emptyState("Loading admin", "Fetching live platform records.");
+      root.innerHTML = emptyState("Loading admin", "Fetching live platform activity.");
       const [overview, pending, allNgos, users, transactions, contacts, analytics] = await Promise.all([
         request("/admin/overview"),
         request("/admin/ngos/pending"),
@@ -451,12 +477,38 @@
     });
   }
 
+  function selectedTokenAmount() {
+    const input = document.getElementById("custom-amount");
+    const raw = input?.value ? Number(input.value) : Number(window.currentDonateAmount || 0);
+    const amount = Math.floor(raw);
+    return Number.isFinite(amount) && amount > 0 ? amount : 0;
+  }
+
+  function setTokenActionBusy(isBusy, message = "Processing...") {
+    const button = document.querySelector("#donate-step1 .btn-primary.btn-full");
+    if (!button) return;
+    button.disabled = isBusy;
+    button.textContent = isBusy ? message : "Continue";
+  }
+
+  async function refreshUserSurfaces() {
+    const dashboardOpen = document.getElementById("page-dashboard")?.classList.contains("active");
+    if (dashboardOpen) await loadDashboard();
+    loadStats();
+    loadLeaderboard("donors");
+  }
+
   async function purchaseTokens(amount) {
     const user = savedUser();
     if (!user) {
       window.openAuthModal?.();
       return;
     }
+    if (!Number.isFinite(Number(amount)) || Number(amount) < 10) {
+      toast("Minimum token purchase is 10 tokens.");
+      return;
+    }
+    setTokenActionBusy(true, "Opening checkout...");
     const order = await request("/tokens/order", { method: "POST", body: { amount, currencyAmount: amount } });
     await ensureRazorpayScript();
     const checkout = new window.Razorpay({
@@ -468,20 +520,28 @@
       order_id: order.orderId,
       prefill: { name: user.name, email: user.email },
       handler: async (payment) => {
+        setTokenActionBusy(true, "Verifying payment...");
         const result = await request("/tokens/verify", {
           method: "POST",
           body: { transactionId: order.transactionId, ...payment },
         });
         saveUser(result.user);
+        updateNav();
         toast("Tokens credited successfully.");
-        await loadDashboard();
+        await refreshUserSurfaces();
+        setTokenActionBusy(false);
       },
+      modal: { ondismiss: () => setTokenActionBusy(false) },
     });
     checkout.open();
   }
 
   window.ServeMATE = {
     request,
+    openRegister() {
+      window.openAuthModal?.();
+      window.switchAuthTab?.("register", document.querySelector("#auth-modal .tab-btn:nth-child(2)"));
+    },
     logout() {
       clearToken();
       clearUser();
@@ -586,21 +646,31 @@
         openAuthModal();
         return;
       }
-      const custom = value("#custom-amount");
-      const amount = Math.max(Number(custom || window.currentDonateAmount || 0), 1);
+      const amount = selectedTokenAmount();
+      if (!amount) {
+        toast("Enter a valid positive token amount.");
+        return;
+      }
       const user = savedUser();
       if ((user?.tokenBalance || 0) < amount) {
         toast("Opening secure checkout to buy virtual support tokens.");
         await purchaseTokens(amount);
         return;
       }
+      if (!value("#donate-cause")) {
+        toast("No active cause is available for token spending yet.");
+        return;
+      }
+      setTokenActionBusy(true, "Using tokens...");
       const result = await request("/contribute", { method: "POST", body: { amount, cause: value("#donate-cause") } });
       saveUser(result.user);
       document.getElementById("success-amount").textContent = `${number(amount)} tokens`;
       document.getElementById("donate-step1").style.display = "none";
       document.getElementById("donate-step2").style.display = "";
-      await loadDashboard();
+      await refreshUserSurfaces();
+      setTokenActionBusy(false);
     } catch (err) {
+      setTokenActionBusy(false);
       toast(`Token action failed: ${err.message}`);
     }
   };

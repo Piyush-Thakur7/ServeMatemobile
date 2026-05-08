@@ -83,6 +83,18 @@ async function createRazorpayOrder({ amountInPaise, receipt }) {
 
 async function creditTokenPurchase(transaction, paymentData = {}) {
   if (transaction.paymentStatus === "success") return transaction;
+  if (paymentData.paymentId) {
+    const existingPayment = await TokenTransaction.findOne({
+      _id: { $ne: transaction._id },
+      providerPaymentId: paymentData.paymentId,
+      paymentStatus: "success",
+    });
+    if (existingPayment) {
+      const error = new Error("Payment has already been credited");
+      error.status = 409;
+      throw error;
+    }
+  }
 
   const user = await User.findById(transaction.userId);
   if (!user) throw new Error("User not found");
@@ -136,10 +148,14 @@ function publicNgo(ngo) {
 
 router.get("/causes", async (req, res) => {
   try {
-    const causes = await Cause.find({ active: true })
-      .populate("assignedNgo", "ngoName name verified approvalStatus")
+    const causes = await Cause.find({ active: true, assignedNgo: { $exists: true, $ne: null } })
+      .populate({
+        path: "assignedNgo",
+        select: "ngoName name verified approvalStatus",
+        match: { verified: true, approvalStatus: "approved" },
+      })
       .sort({ createdAt: -1 });
-    res.json(causes);
+    res.json(causes.filter((cause) => cause.assignedNgo));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -147,8 +163,14 @@ router.get("/causes", async (req, res) => {
 
 router.get("/causes/:id", async (req, res) => {
   try {
-    const cause = await Cause.findById(req.params.id).populate("assignedNgo", "ngoName name verified approvalStatus impactScore");
+    const cause = await Cause.findOne({ _id: req.params.id, active: true, assignedNgo: { $exists: true, $ne: null } })
+      .populate({
+        path: "assignedNgo",
+        select: "ngoName name verified approvalStatus impactScore",
+        match: { verified: true, approvalStatus: "approved" },
+      });
     if (!cause) return res.status(404).json({ error: "Cause not found" });
+    if (!cause.assignedNgo) return res.status(404).json({ error: "Cause not found" });
     res.json(cause);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -158,11 +180,14 @@ router.get("/causes/:id", async (req, res) => {
 router.post("/tokens/order", authMiddleware, async (req, res) => {
   try {
     const tokenAmount = Math.floor(safeNumber(req.body.amount));
-    if (!tokenAmount || tokenAmount < 10) {
-      return res.status(400).json({ error: "Minimum token purchase is 10 tokens" });
+    if (!tokenAmount || tokenAmount < 10 || tokenAmount > 100000) {
+      return res.status(400).json({ error: "Token purchase must be between 10 and 100000 tokens" });
     }
 
     const inrAmount = safeNumber(req.body.currencyAmount, tokenAmount);
+    if (inrAmount <= 0) {
+      return res.status(400).json({ error: "Payment amount must be positive" });
+    }
     const transaction = await TokenTransaction.create({
       userId: req.user.id,
       amount: tokenAmount,
@@ -199,12 +224,22 @@ router.post("/tokens/order", authMiddleware, async (req, res) => {
 router.post("/tokens/verify", authMiddleware, async (req, res) => {
   try {
     const { transactionId, razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+    if (!transactionId || !razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      return res.status(400).json({ error: "Complete Razorpay verification details are required" });
+    }
     const transaction = await TokenTransaction.findOne({
       _id: transactionId,
       userId: req.user.id,
       providerOrderId: razorpay_order_id,
     });
     if (!transaction) return res.status(404).json({ error: "Token transaction not found" });
+    if (transaction.paymentStatus === "success") {
+      const user = await User.findById(req.user.id).select("-password");
+      return res.json({ message: "Tokens already credited", transaction, user: publicUser(user) });
+    }
+    if (!["created", "pending"].includes(transaction.paymentStatus)) {
+      return res.status(409).json({ error: "Payment is no longer eligible for verification" });
+    }
     if (!verifyRazorpaySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature)) {
       transaction.paymentStatus = "failed";
       await transaction.save();
@@ -218,7 +253,7 @@ router.post("/tokens/verify", authMiddleware, async (req, res) => {
     const user = await User.findById(req.user.id).select("-password");
     res.json({ message: "Tokens credited", transaction, user: publicUser(user) });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.status || 500).json({ error: err.message });
   }
 });
 
@@ -260,6 +295,9 @@ async function handleContribution(req, res) {
     const tokenAmount = Math.floor(safeNumber(req.body.amount));
     const causeRef = req.body.causeId || req.body.cause;
     if (!tokenAmount || tokenAmount < 1) return res.status(400).json({ error: "Token amount is required" });
+    if (!causeRef || !mongoose.Types.ObjectId.isValid(causeRef)) {
+      return res.status(400).json({ error: "Choose an approved cause before using tokens" });
+    }
 
     let responsePayload;
     await session.withTransaction(async () => {
@@ -271,9 +309,26 @@ async function handleContribution(req, res) {
         throw error;
       }
 
-      const causeDoc = causeRef && mongoose.Types.ObjectId.isValid(causeRef)
-        ? await Cause.findById(causeRef).session(session)
-        : await Cause.findOne({ category: causeRef || "other", active: true }).sort({ createdAt: -1 }).session(session);
+      const causeDoc = await Cause.findOne({
+        _id: causeRef,
+        active: true,
+        assignedNgo: { $exists: true, $ne: null },
+      }).session(session);
+      if (!causeDoc) {
+        const error = new Error("Cause is not available for token spending");
+        error.status = 400;
+        throw error;
+      }
+      const approvedNgo = await NGO.findOne({
+        _id: causeDoc.assignedNgo,
+        verified: true,
+        approvalStatus: "approved",
+      }).session(session);
+      if (!approvedNgo) {
+        const error = new Error("Cause is awaiting NGO approval");
+        error.status = 400;
+        throw error;
+      }
 
       user.tokenBalance -= tokenAmount;
       user.totalImpact += tokenAmount;
@@ -299,8 +354,8 @@ async function handleContribution(req, res) {
       await TokenTransaction.create(
         [{
           userId: user._id,
-          amount: -tokenAmount,
-          type: "contribution",
+          amount: tokenAmount,
+          type: "spend",
           paymentStatus: "success",
           provider: "system",
           metadata: { causeId: causeDoc?._id, contributionId: contribution[0]._id },
@@ -412,7 +467,7 @@ router.get("/leaderboard/donors", async (req, res) => {
   try {
     const donors = await User.find({ $or: [{ totalTokensPurchased: { $gt: 0 } }, { xp: { $gt: 0 } }] })
       .select("name username profileImage xp level title badges tokenBalance totalTokensPurchased totalImpact")
-      .sort({ totalImpact: -1, xp: -1, totalTokensPurchased: -1 })
+      .sort({ totalTokensPurchased: -1, xp: -1, totalImpact: -1 })
       .limit(100);
     res.json(donors);
   } catch (err) {
@@ -443,8 +498,9 @@ router.get("/dashboard", authMiddleware, async (req, res) => {
       Activity.find({ userId: user._id }).sort({ createdAt: -1 }).limit(10),
       User.countDocuments({
         $or: [
-          { totalImpact: { $gt: user.totalImpact } },
-          { totalImpact: user.totalImpact, xp: { $gt: user.xp } },
+          { totalTokensPurchased: { $gt: user.totalTokensPurchased } },
+          { totalTokensPurchased: user.totalTokensPurchased, xp: { $gt: user.xp } },
+          { totalTokensPurchased: user.totalTokensPurchased, xp: user.xp, totalImpact: { $gt: user.totalImpact } },
         ],
       }),
     ]);

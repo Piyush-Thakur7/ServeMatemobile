@@ -750,8 +750,8 @@
     <li><button class="nav-btn" onclick="showPage('ngos')">NGOs</button></li>
     <li><button class="nav-btn" onclick="showPage('leaderboard')">Leaderboard</button></li>
     <li><button class="nav-btn" onclick="showPage('contact')">Contact</button></li>
-    <li><button class="nav-btn btn-nav-cta" onclick="showPage('dashboard')">Dashboard</button></li>
     <li><button class="nav-btn" onclick="openAuthModal()">Login</button></li>
+    <li><button class="nav-btn btn-nav-cta" onclick="openAuthModal();switchAuthTab('register', document.querySelector('#auth-modal .tab-btn:nth-child(2)'))">Register</button></li>
   </ul>
   <button class="hamburger" id="hamburger" onclick="toggleMobileMenu()" aria-label="Menu">
     <span></span><span></span><span></span>
@@ -761,15 +761,14 @@
 
 <!-- MOBILE MENU -->
 <div class="mobile-menu" id="mobile-menu">
-  <button onclick="mobileNav('home')">🏠 Home</button>
-  <button onclick="mobileNav('about')">💡 What is ServeMate</button>
-  <button onclick="mobileNav('transparency')">🔍 Transparency</button>
-  <button onclick="mobileNav('ngos')">🏢 NGOs</button>
-  <button onclick="mobileNav('leaderboard')">🏆 Leaderboard</button>
-  <button onclick="mobileNav('contact')">📞 Contact</button>
-  <div class="divider-mob"></div>
-  <button onclick="mobileNav('dashboard')" class="cta">📊 Dashboard</button>
-  <button onclick="openAuthModal();closeMobileMenu()">🔑 Login / Register</button>
+  <button onclick="mobileNav('home')">Home</button>
+  <button onclick="mobileNav('about')">What is ServeMate</button>
+  <button onclick="mobileNav('transparency')">Transparency</button>
+  <button onclick="mobileNav('ngos')">NGOs</button>
+  <button onclick="mobileNav('leaderboard')">Leaderboard</button>
+  <button onclick="mobileNav('contact')">Contact</button>
+  <button onclick="openAuthModal();closeMobileMenu()">Login</button>
+  <button onclick="openAuthModal();switchAuthTab('register', document.querySelector('#auth-modal .tab-btn:nth-child(2)'));closeMobileMenu()" class="cta">Register</button>
 </div>
 
 <!-- ============ HOME PAGE ============ -->
@@ -777,9 +776,9 @@
 
   <!-- Hero -->
   <div class="hero">
-    <div class="hero-eyebrow">Live MVP connected to MongoDB-backed workflows</div>
+    <div class="hero-eyebrow">Transparent giving for verified social impact</div>
     <h1>Small Contributions.<br><span class="grad">Real Impact.</span></h1>
-    <p>Use virtual support tokens, follow real platform activity, and see only admin-approved NGO records.</p>
+    <p>Support reviewed NGOs with virtual support tokens, track transparent community impact, and grow your impact journey with others.</p>
     <div class="hero-btns">
       <button class="btn btn-primary btn-lg" onclick="openDonateModal()">🤝 Start Contributing</button>
       <button class="btn btn-outline btn-lg" onclick="showPage('about')">How It Works</button>
@@ -797,8 +796,8 @@
     <div class="container">
       <div class="section-label">🌱 Active Causes</div>
       <h2 class="section-title">Choose Your Impact</h2>
-      <p class="section-sub" style="margin-bottom:2.5rem;">Causes are managed by admins and show live token activity from MongoDB.</p>
-      <div class="grid-3" id="causes-grid"><div class="card cause-card"><h3 style="font-size:1.15rem;font-weight:700;margin-bottom:.35rem;">No active causes yet</h3><p style="font-size:.85rem;color:var(--text2);margin-bottom:1rem;line-height:1.6;">Admin-created causes will appear here without hardcoded totals.</p></div></div></div></section>
+      <p class="section-sub" style="margin-bottom:2.5rem;">Choose reviewed causes and see real community activity as it happens.</p>
+      <div class="grid-3" id="causes-grid"><div class="card cause-card"><h3 style="font-size:1.15rem;font-weight:700;margin-bottom:.35rem;">No active causes yet</h3><p style="font-size:.85rem;color:var(--text2);margin-bottom:1rem;line-height:1.6;">Reviewed causes will appear here when they are ready.</p></div></div></div></section>
 
   <!-- How It Works Mini -->
   <section style="background:var(--bg2);">
@@ -947,7 +946,7 @@
           <span class="xp-count" data-user-xp>0 XP</span>
         </div>
         <div class="progress-track"><div class="progress-fill" data-user-progress style="width:0%"></div></div>
-        <div style="font-size:.75rem;color:var(--text3);margin-top:.4rem;" data-user-next>Activity from MongoDB will appear after login.</div>
+        <div style="font-size:.75rem;color:var(--text3);margin-top:.4rem;" data-user-next>Your activity will appear after login.</div>
       </div>
       <ul class="sidebar-nav" style="margin-top:1rem;">
         <li><button onclick="showDashTab('overview')" class="active" id="stab-overview">Overview</button></li>
@@ -964,14 +963,14 @@
       <div id="dtab-overview">
         <h2 style="font-size:1.4rem;font-weight:800;margin-bottom:1.25rem;" data-dashboard-heading>Your Dashboard</h2>
         <div class="stat-cards">
-          <div class="stat-card"><div class="label">Token Balance</div><div class="value" data-token-balance>0</div><div class="change">Stored in MongoDB</div></div>
+          <div class="stat-card"><div class="label">Token Balance</div><div class="value" data-token-balance>0</div><div class="change">Updated after verified activity</div></div>
           <div class="stat-card"><div class="label">XP Points</div><div class="value" data-xp-total>0</div><div class="change">Earned from real actions</div></div>
-          <div class="stat-card"><div class="label">Leaderboard Rank</div><div class="value" data-user-rank>-</div><div class="change">Calculated from live records</div></div>
-          <div class="stat-card"><div class="label">Impact Score</div><div class="value" data-impact-score>0</div><div class="change">Loaded from live records</div></div>
+          <div class="stat-card"><div class="label">Leaderboard Rank</div><div class="value" data-user-rank>-</div><div class="change">Calculated from real activity</div></div>
+          <div class="stat-card"><div class="label">Impact Score</div><div class="value" data-impact-score>0</div><div class="change">Updated from verified actions</div></div>
         </div>
         <div class="grid-2">
           <div class="card"><h4 style="font-weight:700;margin-bottom:1rem;">Recent Activity</h4><div id="recent-activity"><p style="color:var(--text2);font-size:.9rem;">Real activity will appear here after token purchases or contributions.</p></div></div>
-          <div class="card"><h4 style="font-weight:700;margin-bottom:1rem;">Impact Summary</h4><div id="impact-summary"><p style="color:var(--text2);font-size:.9rem;">Impact stats are loaded from MongoDB.</p></div></div>
+          <div class="card"><h4 style="font-weight:700;margin-bottom:1rem;">Impact Summary</h4><div id="impact-summary"><p style="color:var(--text2);font-size:.9rem;">Your impact summary appears after real token activity.</p></div></div>
         </div>
       </div>
 
@@ -1006,13 +1005,13 @@
     <div class="container">
       <div class="section-label">Full Transparency</div>
       <h2 class="section-title">Verified Activity Log</h2>
-      <p class="section-sub">Published proof appears only after admin verification from MongoDB records.</p>
+      <p class="section-sub">Published proof appears only after review and verification.</p>
     </div>
   </section>
   <section style="padding-top:2rem;">
     <div class="container">
       <div class="timeline" id="transparency-feed">
-        <div class="timeline-item"><div class="timeline-dot"></div><div class="timeline-card"><h4>No verified activity published yet</h4><p style="font-size:.85rem;color:var(--text2);line-height:1.5;">Completed work logs will appear here after admin review. No placeholder proof is shown.</p></div></div>
+        <div class="timeline-item"><div class="timeline-dot"></div><div class="timeline-card"><h4>No verified activity published yet</h4><p style="font-size:.85rem;color:var(--text2);line-height:1.5;">Completed work updates will appear here after review. No placeholder proof is shown.</p></div></div>
       </div>
     </div>
   </section>
@@ -1025,7 +1024,7 @@
       <div>
         <div class="section-label">NGO Network</div>
         <h2 class="section-title">Approved NGO Partners</h2>
-        <p class="section-sub">Only admin-approved NGOs from MongoDB are shown publicly.</p>
+        <p class="section-sub">Only approved NGOs are shown publicly.</p>
       </div>
       <button class="btn btn-orange" onclick="openNGORegModal()">+ Register Your NGO</button>
     </div>
@@ -1039,7 +1038,7 @@
     <div class="container">
       <div class="section-label">Rankings</div>
       <h2 class="section-title">Leaderboard</h2>
-      <p class="section-sub">Top users and NGOs are ranked only from live MongoDB token, XP, and impact records.</p>
+      <p class="section-sub">Top users and NGOs are ranked only from real token, XP, and impact activity.</p>
     </div>
   </section>
   <section style="padding-top:2rem;">
@@ -1116,7 +1115,7 @@
   <div class="modal">
     <button class="modal-close" onclick="closeModal('auth-modal')">✕</button>
     <h2>Welcome to ServeMate</h2>
-    <p class="sub">Create an account to use real ServeMATE token workflows.</p>
+    <p class="sub">Create an account to buy tokens, support causes, and track your impact.</p>
     <div class="modal-tabs">
       <button class="tab-btn active" onclick="switchAuthTab('login', this)">Login</button>
       <button class="tab-btn" onclick="switchAuthTab('register', this)">Register</button>
@@ -1145,9 +1144,7 @@
       <div class="form-group">
         <label>Select Cause</label>
         <select id="donate-cause">
-          <option value="meals">🍱 Feed the Hungry</option>
-          <option value="trees">🌳 Plant Trees</option>
-          <option value="essentials">🧺 Essentials Kit</option>
+          <option value="">Choose an active cause</option>
         </select>
       </div>
       <label style="font-size:.8rem;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:.75rem;">Select Tokens</label>
@@ -1161,7 +1158,7 @@
       </div>
       <div class="form-group">
         <label>Or Enter Custom Amount</label>
-        <input type="number" id="custom-amount" placeholder="Enter token amount" oninput="updateImpact()">
+        <input type="number" id="custom-amount" min="1" step="1" value="50" placeholder="Enter token amount" oninput="updateImpact()">
       </div>
       <div class="impact-preview" id="impact-preview">
         <p>50 tokens can be used for a virtual support action after payment verification.</p>
@@ -1274,18 +1271,24 @@
   }
 
   function selectAmount(amt, btn) {
-    currentDonateAmount = amt;
+    currentDonateAmount = Math.max(parseInt(amt, 10) || 0, 0);
     document.querySelectorAll('.amount-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    document.getElementById('custom-amount').value = '';
+    document.getElementById('custom-amount').value = currentDonateAmount;
     updateImpact();
   }
 
   function updateImpact() {
-    const custom = document.getElementById('custom-amount').value;
-    const amt = custom ? parseInt(custom, 10) : currentDonateAmount;
+    const input = document.getElementById('custom-amount');
+    const amt = input.value ? parseInt(input.value, 10) : currentDonateAmount;
     const safeAmount = Number.isFinite(amt) && amt > 0 ? amt : 0;
-    document.getElementById('impact-preview').innerHTML = `<p>${safeAmount} virtual support token(s) selected.</p>`;
+    if (input.value && safeAmount !== amt) input.value = '';
+    document.querySelectorAll('.amount-btn').forEach(b => {
+      const buttonAmount = parseInt(b.textContent, 10);
+      b.classList.toggle('active', buttonAmount === safeAmount);
+    });
+    currentDonateAmount = safeAmount || currentDonateAmount;
+    document.getElementById('impact-preview').innerHTML = `<p>${safeAmount ? safeAmount : 'No'} virtual support token(s) selected. XP preview: ${safeAmount} on purchase, ${Math.ceil(safeAmount / 2)} when used for a cause.</p>`;
   }
 
   function showDonateSuccess() {
@@ -1397,7 +1400,7 @@ function openUserProfile() {
   showToast('User profiles are loaded from live account data after login.');
 }
 function openNGOProfile() {
-  showToast('NGO profiles are shown only for approved MongoDB records.');
+  showToast('NGO profiles are shown only after approval.');
 }
 
 // Close profile modals on overlay click
