@@ -6,11 +6,11 @@ const { getProgression } = require("./services/gamificationService");
 
 const router = express.Router();
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ════════════════════════════════════════════════════════════════════════════
 //  CAUSES
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ════════════════════════════════════════════════════════════════════════════
 
-// GET /api/causes  â€” all active causes (for homepage cards)
+// GET /api/causes  — all active causes (for homepage cards)
 router.get("/causes", async (req, res) => {
   try {
     const causes = await Cause.find({ active: true })
@@ -34,26 +34,75 @@ router.get("/causes/:id", async (req, res) => {
   }
 });
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ════════════════════════════════════════════════════════════════════════════
 //  DONATIONS
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ════════════════════════════════════════════════════════════════════════════
 
-// POST /api/donate  â€” authenticated user donates to a cause
+const CORE_CAUSE_FALLBACKS = {
+  meals: {
+    title: "Meals for All",
+    description: "Provide nutritious meals to underprivileged children and elderly. Rs 10 feeds one person.",
+    icon: "Meals",
+    goal: 100000,
+    impactPerRupee: "Rs 10 feeds 1 person for a day",
+  },
+  trees: {
+    title: "Tree Plantation Drive",
+    description: "Plant trees across urban wastelands and barren hillsides. Rs 50 plants and nurtures one tree.",
+    icon: "Trees",
+    goal: 100000,
+    impactPerRupee: "Rs 50 = 1 tree planted and maintained",
+  },
+  essentials: {
+    title: "Daily Essentials Kit",
+    description: "Distribute hygiene kits and essential supplies to families in need.",
+    icon: "Essentials",
+    goal: 100000,
+    impactPerRupee: "Rs 100 = 1 complete hygiene kit",
+  },
+  "ngo-support": {
+    title: "NGO Community Support",
+    description: "Support verified NGOs with proof uploads, volunteer tools, and community response.",
+    icon: "NGO",
+    goal: 100000,
+    impactPerRupee: "Verified NGO support",
+  },
+};
+
+async function resolveDonationCause(causeId, causeCategory) {
+  const coreCategories = Object.keys(CORE_CAUSE_FALLBACKS);
+  const category = causeCategory || (coreCategories.includes(causeId) ? causeId : null);
+
+  if (causeId && !coreCategories.includes(causeId)) {
+    return Cause.findById(causeId);
+  }
+
+  if (!category || !coreCategories.includes(category)) return null;
+
+  let cause = await Cause.findOne({ category, active: true });
+  if (cause) return cause;
+
+  return Cause.create({
+    ...CORE_CAUSE_FALLBACKS[category],
+    category,
+    raised: 0,
+    contributors: 0,
+    active: true,
+  });
+}
+
+// POST /api/donate - authenticated user donates to a cause
 router.post("/donate", authMiddleware, async (req, res) => {
   try {
     const { causeId, cause: causeCategory, amount } = req.body;
     const safeAmount = Math.floor(Number(amount));
     if ((!causeId && !causeCategory) || !Number.isFinite(safeAmount) || safeAmount < 10)
       return res.status(400).json({ error: "Cause and minimum amount of Rs 10 required" });
-    const coreCategories = ["meals", "trees", "essentials", "ngo-support"];
-    const category = causeCategory || (coreCategories.includes(causeId) ? causeId : null);
-    const cause = causeId && !coreCategories.includes(causeId)
-      ? await Cause.findById(causeId)
-      : await Cause.findOne({ category, active: true });
+    const cause = await resolveDonationCause(causeId, causeCategory);
     if (!cause || !cause.active)
       return res.status(404).json({ error: "Cause not found or inactive" });
 
-    // XP earned = 1 XP per â‚¹1 donated (min 10)
+    // XP earned = 1 XP per Rs 1 donated (min 10)
     const xpEarned = safeAmount;
 
     // Create donation record
@@ -124,7 +173,7 @@ router.post("/donate", authMiddleware, async (req, res) => {
   }
 });
 
-// GET /api/donations/history  â€” user's own donation history
+// GET /api/donations/history  — user's own donation history
 router.get("/donations/history", authMiddleware, async (req, res) => {
   try {
     const donations = await Donation.find({ user: req.user.id })
@@ -149,11 +198,11 @@ router.get("/donations", authMiddleware, async (req, res) => {
   }
 });
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ════════════════════════════════════════════════════════════════════════════
 //  TRANSPARENCY LOG
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ════════════════════════════════════════════════════════════════════════════
 
-// GET /api/transparency  â€” public feed of all completed works
+// GET /api/transparency  — public feed of all completed works
 router.get("/transparency", async (req, res) => {
   try {
     const { cause, ngo, page = 1, limit = 10 } = req.query;
@@ -175,11 +224,11 @@ router.get("/transparency", async (req, res) => {
   }
 });
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ════════════════════════════════════════════════════════════════════════════
 //  NGO PUBLIC DIRECTORY
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ════════════════════════════════════════════════════════════════════════════
 
-// GET /api/ngos  â€” list verified NGOs sorted by rank
+// GET /api/ngos  — list verified NGOs sorted by rank
 router.get("/ngos", async (req, res) => {
   try {
     const ngos = await NGO.find({ verified: true })
@@ -227,9 +276,9 @@ router.get("/ngo/:id", async (req, res) => {
   }
 });
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ════════════════════════════════════════════════════════════════════════════
 //  LEADERBOARD
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ════════════════════════════════════════════════════════════════════════════
 
 // GET /api/leaderboard/donors
 router.get("/leaderboard/donors", async (req, res) => {
@@ -293,11 +342,11 @@ router.get("/leaderboard/:type", async (req, res) => {
   return res.status(404).json({ error: "Leaderboard not found" });
 });
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ════════════════════════════════════════════════════════════════════════════
 //  USER DASHBOARD
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ════════════════════════════════════════════════════════════════════════════
 
-// GET /api/dashboard  â€” full dashboard data for logged-in user
+// GET /api/dashboard  — full dashboard data for logged-in user
 router.get("/dashboard", authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("-password");
@@ -377,9 +426,9 @@ router.post("/ngos/:id/volunteers", authMiddleware, async (req, res) => {
   }
 });
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ════════════════════════════════════════════════════════════════════════════
 //  CONTACT
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ════════════════════════════════════════════════════════════════════════════
 
 // POST /api/contact
 router.post("/contact", async (req, res) => {
@@ -394,9 +443,9 @@ router.post("/contact", async (req, res) => {
   }
 });
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ════════════════════════════════════════════════════════════════════════════
 //  STATS (for hero section)
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ════════════════════════════════════════════════════════════════════════════
 
 // GET /api/stats
 router.get("/stats", async (req, res) => {

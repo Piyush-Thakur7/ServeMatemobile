@@ -479,7 +479,7 @@
     request,
     login: (email, password) => request("/auth/login", { method: "POST", body: { email, password } }).then((data) => (setSession(data), data)),
     register: (name, email, password) => request("/auth/register", { method: "POST", body: { name, email, password } }).then((data) => (setSession(data), data)),
-    donate: (amount, cause) => request("/donate", { method: "POST", body: { amount, cause } }),
+    donate: (amount, cause) => request("/donate", { method: "POST", body: { amount, cause, causeId: cause } }),
     registerNGO: (payload) => request("/auth/ngo/register", { method: "POST", body: payload }),
     updateProfile: (payload) => request("/profile", { method: "PATCH", body: payload }),
     volunteer: (ngoId, payload = {}) => request(`/ngos/${ngoId}/volunteers`, { method: "POST", body: payload }),
@@ -513,11 +513,29 @@
     const custom = value("#custom-amount");
     const selected = document.querySelector(".amount-btn.active")?.textContent || "";
     const amount = custom ? Number(custom) : Number(selected.replace(/[^\d]/g, "")) || 50;
-    const cause = value("#donate-cause");
+    const causeSelect = document.getElementById("donate-cause");
+    const cause = causeSelect?.value || "";
+    if (!cause) {
+      notify("Please select a cause before donating.");
+      causeSelect?.focus();
+      return;
+    }
+    if (!Number.isFinite(amount) || amount < 10) {
+      notify("Minimum donation amount is Rs 10.");
+      return;
+    }
+    const button = document.querySelector("#donate-step1 .btn-primary.btn-full");
+    const originalText = button?.textContent;
     try {
+      if (button) {
+        button.disabled = true;
+        button.textContent = "Processing payment...";
+      }
       const result = await BackendService.donate(amount, cause);
       state.payment.lastDonation = result.donation;
       document.getElementById("success-amount").textContent = money(result.donation?.amount || amount);
+      const successCause = document.querySelector("#donate-step2 strong:last-of-type");
+      if (successCause) successCause.textContent = causeSelect.options[causeSelect.selectedIndex]?.textContent?.replace(/^[^\w]+/, "").trim() || "selected cause";
       const xpBadge = document.querySelector("#donate-step2 .badge");
       if (xpBadge) xpBadge.textContent = `+${compactNumber(result.donation?.xpEarned || amount)} XP`;
       document.getElementById("donate-step1").style.display = "none";
@@ -525,6 +543,11 @@
       await Promise.all([loadDashboard(), loadCauses(), loadLeaderboard("donors")]);
     } catch (err) {
       notify(`Donation failed: ${err.message}`);
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = originalText || "Donate Now";
+      }
     }
   };
 
