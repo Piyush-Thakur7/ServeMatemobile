@@ -9,6 +9,7 @@ const { ADMIN_EMAIL } = require("./authUtils");
 const { router: authRouter } = require("./authRoutes");
 const apiRouter = require("./apiRoutes");
 const adminRouter = require("./adminRoutes");
+const { apiLimiter } = require("./src/middleware/rateLimit");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -36,16 +37,12 @@ app.use(
   })
 );
 
-app.use(express.json({
-  limit: "10mb",
-  verify: (req, res, buf) => {
-    req.rawBody = buf.toString("utf8");
-  },
-}));
+app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
+app.use("/api", apiLimiter);
 
 app.get("/api/health", (req, res) => {
-  res.status(200).json({
+  res.json({
     status: "ok",
     mongo: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
     time: new Date().toISOString(),
@@ -91,7 +88,7 @@ async function connectMongo() {
   const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI;
 
   if (!mongoUri) {
-    console.warn("[mongo] MONGO_URI or MONGODB_URI is not set. Server started without database connectivity.");
+    console.warn("[mongo] MONGO_URI or MONGODB_URI is not set. Server will start without database connectivity.");
     return;
   }
 
@@ -116,19 +113,62 @@ mongoose.connection.on("reconnected", () => {
 });
 
 async function seedDatabase() {
-  const { User, Badge, badgeCatalog } = require("./models");
+  const { Cause, User } = require("./models");
   const bcrypt = require("bcryptjs");
 
-  await Badge.bulkWrite(
-    badgeCatalog.map((badge) => ({
-      updateOne: { filter: { key: badge.key }, update: { $setOnInsert: badge }, upsert: true },
-    }))
-  );
+  const causeCount = await Cause.countDocuments();
+  if (causeCount === 0) {
+    await Cause.insertMany([
+      {
+        title: "Meals for All",
+        description: "Provide nutritious meals to underprivileged children and elderly. Every ₹10 feeds one person.",
+        icon: "🍱",
+        category: "meals",
+        goal: 100000,
+        raised: 0,
+        contributors: 0,
+        impactPerRupee: "₹10 feeds 1 person for a day",
+      },
+      {
+        title: "Tree Plantation Drive",
+        description: "Plant trees across urban wastelands and barren hillsides. ₹50 plants and nurtures one tree for a full year.",
+        icon: "🌱",
+        category: "trees",
+        goal: 100000,
+        raised: 0,
+        contributors: 0,
+        impactPerRupee: "₹50 = 1 tree planted and maintained",
+      },
+      {
+        title: "Daily Essentials Kit",
+        description: "Distribute hygiene kits and essential supplies to families in flood-affected zones.",
+        icon: "🧴",
+        category: "essentials",
+        goal: 100000,
+        raised: 0,
+        contributors: 0,
+        impactPerRupee: "₹100 = 1 complete hygiene kit",
+      },
+      {
+        title: "NGO Community Support",
+        description: "Support verified NGOs with operational essentials, proof uploads, volunteer tools, and community response.",
+        icon: "🤝",
+        category: "ngo-support",
+        goal: 100000,
+        raised: 0,
+        contributors: 0,
+        impactPerRupee: "Verified NGO support",
+      },
+    ]);
+    console.log("[seed] Causes seeded");
+  }
 
   const adminExists = await User.findOne({ email: ADMIN_EMAIL });
   if (!adminExists) {
     if (!process.env.ADMIN_PASSWORD) {
-      console.warn(`[seed] ADMIN_PASSWORD is not set. Admin user ${ADMIN_EMAIL} was not auto-created.`);
+      console.warn(
+        `[seed] ADMIN_PASSWORD is not set. Admin user ${ADMIN_EMAIL} was not auto-created.`
+      );
       return;
     }
 
@@ -141,9 +181,9 @@ async function seedDatabase() {
     });
     console.log(`[seed] Admin user created: ${ADMIN_EMAIL}`);
   } else if (adminExists.role !== "admin") {
-    adminExists.role = "admin";
-    await adminExists.save();
-    console.log(`[seed] Admin privileges repaired for ${ADMIN_EMAIL}`);
+    console.warn(
+      `[seed] ${ADMIN_EMAIL} exists but is not an admin. Update this user role manually before using admin APIs.`
+    );
   }
 }
 

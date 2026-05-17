@@ -1,3 +1,10 @@
-PORT=5000
-MONGODB_URI=mongodb://localhost:27017/servemate
-JWT_SECRET=servemate_super_secret_key_123
+node_modules/
+.env
+.env.*
+!.env.example
+npm-debug.log*
+*.log
+.DS_Store
+edge-profile-*/
+servemate-*.png
+pushrepo/

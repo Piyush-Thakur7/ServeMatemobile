@@ -1,32 +1,84 @@
-﻿(function () {
-  const API_BASE = window.SERVEMATE_API_BASE_URL || "https://servemate.onrender.com/api";
+(function () {
+  const API_BASE = window.SERVEMATE_API_BASE_URL ||
+    (["localhost", "127.0.0.1"].includes(window.location.hostname) || window.location.port
+      ? `${window.location.origin}/api`
+      : "https://servemate.onrender.com/api");
+
   const tokenKey = "servemate_token";
   const userKey = "servemate_user";
 
-  const getToken = () => localStorage.getItem(tokenKey) || localStorage.getItem("sm_token");
-  const setToken = (token) => {
-    localStorage.setItem(tokenKey, token);
-    localStorage.setItem("sm_token", token);
+  const state = {
+    auth: { token: localStorage.getItem(tokenKey), user: readUser() },
+    causes: [],
+    leaderboard: { donors: [], ngos: [] },
+    dashboard: null,
+    payment: { lastDonation: null },
+    modals: {},
+    notifications: [],
   };
-  const clearToken = () => {
-    localStorage.removeItem(tokenKey);
-    localStorage.removeItem("sm_token");
-  };
-  const savedUser = () => {
+
+  const coreCauses = [
+    {
+      category: "trees",
+      title: "Trees / Environment",
+      eyebrow: "Environment",
+      description: "Environmental restoration, tree plantation, survival proof, and verified green drives.",
+      icon: "\u{1F333}",
+      accent: "cause-green",
+      empty: "New verified causes coming soon",
+    },
+    {
+      category: "meals",
+      title: "Meals / Hunger Relief",
+      eyebrow: "Hunger Relief",
+      description: "Food security campaigns, warm community kitchens, and hunger relief support.",
+      icon: "\u{1F35B}",
+      accent: "cause-warm",
+      empty: "No community activity yet",
+    },
+    {
+      category: "essentials",
+      title: "Essentials / Emergency Support",
+      eyebrow: "Emergency Support",
+      description: "Emergency kits, hygiene essentials, and immediate relief for families facing crisis.",
+      icon: "\u{1F9F0}",
+      accent: "cause-relief",
+      empty: "Be the first supporter",
+    },
+    {
+      category: "ngo-support",
+      title: "NGO Community Support",
+      eyebrow: "Verified NGOs",
+      description: "Operational support, proof uploads, volunteer tools, and community response for verified NGOs.",
+      icon: "\u{1F91D}",
+      accent: "cause-trust",
+      empty: "New verified causes coming soon",
+    },
+  ];
+
+  function readUser() {
     try {
-      return JSON.parse(localStorage.getItem(userKey) || localStorage.getItem("sm_user") || "null");
-    } catch {
+      return JSON.parse(localStorage.getItem(userKey) || "null");
+    } catch (_) {
       return null;
     }
-  };
-  const saveUser = (user) => {
-    localStorage.setItem(userKey, JSON.stringify(user));
-    localStorage.setItem("sm_user", JSON.stringify(user));
-  };
-  const clearUser = () => {
-    localStorage.removeItem(userKey);
-    localStorage.removeItem("sm_user");
-  };
+  }
+
+  function setSession(data) {
+    if (data.token) {
+      localStorage.setItem(tokenKey, data.token);
+      state.auth.token = data.token;
+    }
+    if (data.user || data.ngo) {
+      state.auth.user = data.user || data.ngo;
+      localStorage.setItem(userKey, JSON.stringify(state.auth.user));
+    }
+    renderAuthShell();
+  }
+
+  function getToken() {
+    return state.auth.token || localStorage.getItem(tokenKey);
+  }
 
   async function request(path, options = {}) {
     const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
@@ -34,581 +86,403 @@
     if (token) headers.Authorization = `Bearer ${token}`;
 
     const response = await fetch(`${API_BASE}${path}`, {
-      method: options.method || "GET",
+      ...options,
       headers,
       body: options.body ? JSON.stringify(options.body) : undefined,
     });
 
     const text = await response.text();
     const data = text ? JSON.parse(text) : {};
-    if (!response.ok) {
-      if (response.status === 401) {
-        clearToken();
-        clearUser();
-        updateNav();
-      }
-      throw new Error(data.error || data.message || "Request failed");
-    }
+    if (!response.ok) throw new Error(data.error || data.message || "Request failed");
     return data;
   }
 
-  const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#039;",
-  }[char]));
-  const value = (selector, root = document) => root?.querySelector(selector)?.value?.trim() || "";
-  const number = (value) => Number(value || 0).toLocaleString("en-IN");
-  const initials = (name) => String(name || "SM").split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0].toUpperCase()).join("") || "SM";
-  const toast = (message) => window.showToast ? window.showToast(message) : alert(message);
-  const publicNav = [
-    { label: "Home", page: "home" },
-    { label: "What is ServeMate", page: "about" },
-    { label: "Transparency", page: "transparency" },
-    { label: "NGOs", page: "ngos" },
-    { label: "Leaderboard", page: "leaderboard" },
-    { label: "Contact", page: "contact" },
-  ];
-
-  function navItems(user) {
-    const items = [...publicNav];
-    if (!user) {
-      return [
-        ...items,
-        { label: "Login", action: "openAuthModal()" },
-        { label: "Register", action: "ServeMATE.openRegister()", cta: true },
-      ];
-    }
-    items.push({ label: "Dashboard", page: "dashboard" });
-    if (user.role === "admin") items.push({ label: "Admin Panel", page: "admin", cta: true });
-    items.push({ label: "Profile", page: "dashboard" }, { label: "Logout", action: "ServeMATE.logout()" });
-    return items;
+  function value(selector, root = document) {
+    return root.querySelector(selector)?.value?.trim() || "";
   }
 
-  function renderNavButton(item, mobile = false) {
-    const classes = mobile ? (item.cta ? ` class="cta"` : "") : ` class="nav-btn${item.cta ? " btn-nav-cta" : ""}"`;
-    const action = item.page ? `${mobile ? "mobileNav" : "showPage"}('${item.page}')` : item.action;
-    return mobile
-      ? `<button data-sm-nav${classes} onclick="${action}">${esc(item.label)}</button>`
-      : `<li data-sm-nav><button${classes} onclick="${action}">${esc(item.label)}</button></li>`;
+  function escapeHtml(input) {
+    return String(input || "").replace(/[&<>"']/g, (char) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#039;",
+    }[char]));
   }
 
-  function emptyState(title, body) {
-    return `<div class="card sm-empty"><h4>${esc(title)}</h4><p>${esc(body)}</p></div>`;
+  function initials(name) {
+    return String(name || "SM")
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0].toUpperCase())
+      .join("") || "SM";
   }
 
-  function updateNav() {
-    const user = savedUser();
-    const nav = document.querySelector(".nav-links");
-    if (nav) {
-      nav.innerHTML = navItems(user).map((item) => renderNavButton(item)).join("");
-    }
-
-    const mobile = document.getElementById("mobile-menu");
-    if (mobile) {
-      mobile.innerHTML = navItems(user).map((item) => renderNavButton(item, true)).join("");
-    }
+  function compactNumber(value, options = {}) {
+    const n = Number(value || 0);
+    const sign = n < 0 ? "-" : "";
+    const abs = Math.abs(n);
+    const prefix = options.money ? "Rs " : "";
+    if (abs >= 1000000000) return `${sign}${prefix}${trim(abs / 1000000000)}B`;
+    if (abs >= 1000000) return `${sign}${prefix}${trim(abs / 1000000)}M`;
+    if (abs >= 1000) return `${sign}${prefix}${trim(abs / 1000)}K`;
+    return `${sign}${prefix}${abs.toLocaleString("en-IN")}`;
   }
 
-  async function restoreSession() {
-    if (!getToken()) {
-      updateNav();
-      return null;
-    }
-    try {
-      const data = await request("/auth/me");
-      saveUser(data.user);
-      updateNav();
-      return data.user;
-    } catch {
-      return null;
-    }
+  function trim(value) {
+    return value.toFixed(value >= 10 ? 0 : 1).replace(/\.0$/, "");
   }
 
-  function protectPage(page) {
-    if ((page === "dashboard" || page === "admin") && !getToken()) {
-      toast("Please log in to continue.");
-      window.openAuthModal?.();
-      return false;
-    }
-    const user = savedUser();
-    if (page === "admin" && user?.role !== "admin") {
-      toast("Admin access required.");
-      return false;
-    }
-    return true;
+  function money(amount) {
+    return `Rs ${Number(amount || 0).toLocaleString("en-IN")}`;
   }
 
-  function patchShowPage() {
-    const original = window.showPage;
-    if (typeof original !== "function") return;
-    window.showPage = function patchedShowPage(page) {
-      if (!protectPage(page)) return;
-      original(page);
-      if (page === "dashboard") loadDashboard();
-      if (page === "leaderboard") loadLeaderboard("donors");
-      if (page === "ngos") loadNGOs();
-      if (page === "admin") loadAdmin();
-    };
+  function injectStyles() {
+    if (document.getElementById("servemate-premium-runtime-css")) return;
+    const style = document.createElement("style");
+    style.id = "servemate-premium-runtime-css";
+    style.textContent = `
+      .premium-cause-card {
+        min-height: 372px; border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
+        border-radius: 22px; padding: 1.15rem; overflow: hidden; position: relative;
+        background: linear-gradient(180deg, color-mix(in srgb, var(--card) 92%, transparent), var(--card));
+        box-shadow: 0 24px 70px rgba(15,23,42,.09);
+        transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+      }
+      .premium-cause-card:hover { transform: translateY(-6px); box-shadow: 0 32px 90px rgba(15,23,42,.16); border-color: color-mix(in srgb, var(--blue) 34%, var(--border)); }
+      .cause-visual { height: 138px; border-radius: 18px; position: relative; display: flex; align-items: center; justify-content: center; margin-bottom: 1rem; isolation: isolate; overflow:hidden; }
+      .cause-visual::before { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at 28% 22%, rgba(255,255,255,.82), transparent 30%), linear-gradient(135deg, var(--c1), var(--c2)); z-index: -2; }
+      .cause-visual::after { content: ""; position: absolute; inset: 12px; border: 1px solid rgba(255,255,255,.38); border-radius: 14px; z-index: -1; }
+      .cause-visual .art { font-size: 3.2rem; filter: drop-shadow(0 12px 22px rgba(0,0,0,.18)); transform: translateZ(0); }
+      .cause-green { --c1:#dcfce7; --c2:#16a34a; }
+      .cause-warm { --c1:#ffedd5; --c2:#ea580c; }
+      .cause-relief { --c1:#dbeafe; --c2:#2563eb; }
+      .cause-trust { --c1:#ede9fe; --c2:#7c3aed; }
+      .cause-chip, .rank-chip, .token-chip {
+        display:inline-flex; align-items:center; gap:.35rem; border-radius:999px; padding:.35rem .65rem;
+        font-size:.74rem; font-weight:800; border:1px solid rgba(255,255,255,.28);
+        background: color-mix(in srgb, var(--card) 72%, transparent); box-shadow: inset 0 1px rgba(255,255,255,.35);
+      }
+      .token-chip { background: linear-gradient(135deg,#facc15,#f97316); color:#431407; border:0; box-shadow:0 12px 28px rgba(249,115,22,.24); }
+      .cause-empty-state { margin-top: 1rem; border-radius: 16px; padding: .9rem; background: color-mix(in srgb, var(--bg2) 82%, transparent); border: 1px dashed var(--border); color: var(--text2); font-weight: 800; }
+      .premium-progress { height: 11px; border-radius: 999px; overflow: hidden; background: var(--bg3); position: relative; }
+      .premium-progress > span { display:block; height:100%; min-width: 0; border-radius: inherit; background: linear-gradient(90deg, var(--blue), var(--orange)); transition: width .65s ease; }
+      .rank-chip { color: white; border: 0; text-shadow: 0 1px 12px rgba(0,0,0,.18); box-shadow: 0 10px 26px rgba(79,70,229,.24); }
+      .lb-row { position: relative; overflow: hidden; }
+      .lb-row::after { content:""; position:absolute; inset:0; background:linear-gradient(90deg, transparent, rgba(255,255,255,.08), transparent); transform:translateX(-120%); transition:transform .6s ease; pointer-events:none; }
+      .lb-row:hover::after { transform:translateX(120%); }
+      .empty-panel { padding: 1.5rem; border-radius: 18px; border: 1px dashed var(--border); background: color-mix(in srgb, var(--card) 78%, var(--bg2)); text-align: center; color: var(--text2); }
+      .title-card { padding:1rem; border-radius:20px; color:#fff; position:relative; overflow:hidden; box-shadow:0 22px 70px rgba(79,70,229,.24); }
+      .title-card::before { content:""; position:absolute; inset:-2px; background:linear-gradient(120deg, rgba(255,255,255,.42), transparent 34%, rgba(255,255,255,.24)); animation: sm-sheen 3s linear infinite; }
+      .title-card > * { position:relative; }
+      .sm-skeleton { opacity:.75; }
+      @keyframes sm-sheen { from { transform: translateX(-80%); } to { transform: translateX(80%); } }
+      @media (max-width: 720px) { .premium-cause-card { min-height: auto; } .cause-visual { height: 112px; } .lb-row { align-items:flex-start; } }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function clearDemoShell() {
+    renderCauses(document.getElementById("causes-grid"), []);
+    renderLeaderboard("donors", []);
+    renderLeaderboard("ngos", []);
+    renderLoggedOutDashboard();
+    document.querySelectorAll(".hero-stat .num").forEach((node) => (node.textContent = "0"));
   }
 
   async function loadStats() {
     try {
       const stats = await request("/stats");
-      document.querySelectorAll("[data-stat='donated']").forEach((el) => {
-        el.textContent = `${number(stats.totalTokensPurchased)} tokens`;
+      const values = [
+        compactNumber(stats.totalDonated, { money: true }),
+        compactNumber(stats.verifiedTasks),
+        compactNumber(stats.verifiedNGOs),
+        compactNumber(stats.totalDonations),
+      ];
+      document.querySelectorAll(".hero-stat .num").forEach((node, index) => {
+        node.textContent = values[index] || "0";
       });
-      document.querySelectorAll("[data-stat='lives']").forEach((el) => {
-        el.textContent = `${number(stats.totalImpact)} impact`;
-      });
-      document.querySelectorAll("[data-stat='ngos']").forEach((el) => {
-        el.textContent = `${number(stats.verifiedNGOs)} NGOs`;
-      });
-      document.querySelectorAll("[data-stat='users']").forEach((el) => {
-        el.textContent = number(stats.totalUsers);
-      });
-    } catch {}
+    } catch (_) {
+      document.querySelectorAll(".hero-stat .num").forEach((node) => (node.textContent = "0"));
+    }
   }
 
   async function loadCauses() {
     const grid = document.getElementById("causes-grid");
-    const causeSelect = document.getElementById("donate-cause");
-    if (!grid && !causeSelect) return;
+    if (!grid) return;
     try {
       const causes = await request("/causes");
-      if (causeSelect) {
-        causeSelect.innerHTML = causes.length
-          ? causes.map((cause) => `<option value="${esc(cause._id)}">${esc(cause.title)}</option>`).join("")
-          : `<option value="">No active causes yet</option>`;
-        causeSelect.disabled = !causes.length;
-      }
-      if (!grid) return;
-      grid.innerHTML = causes.length ? causes.map((cause) => {
-        const hasActivity = Number(cause.raised || 0) > 0 || Number(cause.contributors || 0) > 0;
-        const pct = cause.goal ? Math.min(Math.round(((cause.raised || 0) / cause.goal) * 100), 100) : 0;
-        return `
-          <div class="card cause-card">
-            <div class="cause-icon">${esc(cause.icon || "SM")}</div>
-            <h3 style="font-size:1.15rem;font-weight:700;margin-bottom:.35rem;">${esc(cause.title)}</h3>
-            <p style="font-size:.85rem;color:var(--text2);margin-bottom:1rem;line-height:1.6;">${esc(cause.description)}</p>
-            ${hasActivity ? `
-              <div class="cause-meta"><span>Community activity</span><span class="cause-raised">${number(cause.raised || 0)} tokens</span></div>
-              <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
-            ` : `<div class="sm-empty" style="padding:1rem;margin:0 0 1rem;"><h4>No community activity yet</h4><p>Be the first supporter for this cause.</p></div>`}
-            <div class="cause-footer">
-              <span style="font-size:.8rem;color:var(--text2);">${hasActivity ? `${number(cause.contributors || 0)} contributors` : "No contributors yet"}</span>
-              <button class="btn btn-primary" onclick="openDonateModal('${esc(cause._id)}')">Use Tokens</button>
-            </div>
-          </div>
-        `;
-      }).join("") : emptyState("No active causes yet", "Reviewed causes will appear here when they are ready.");
-    } catch (err) {
-      if (grid) grid.innerHTML = emptyState("Causes unavailable", err.message);
-      if (causeSelect) {
-        causeSelect.innerHTML = `<option value="">Causes unavailable</option>`;
-        causeSelect.disabled = true;
-      }
+      state.causes = mergeCauseRows(Array.isArray(causes) ? causes : []);
+    } catch (_) {
+      state.causes = mergeCauseRows([]);
     }
+    renderCauses(grid, state.causes);
   }
 
-  function clearFakeSections() {
-    const donorRows = document.getElementById("lb-donors");
-    const ngoRows = document.getElementById("lb-ngos");
-    if (donorRows) donorRows.innerHTML = emptyState("Leaderboard loading", "Real rankings will appear after verified activity loads.");
-    if (ngoRows) ngoRows.innerHTML = emptyState("NGO leaderboard loading", "Only approved NGOs are shown here.");
+  function mergeCauseRows(rows) {
+    const byCategory = new Map(rows.map((row) => [row.category, row]));
+    return coreCauses.map((core) => ({ ...core, ...(byCategory.get(core.category) || {}), ...core }));
+  }
 
-    const ngoGrid = document.querySelector("#page-ngos .grid-3");
-    if (ngoGrid) ngoGrid.innerHTML = emptyState("No approved NGOs yet", "Approved NGO applications will appear here after admin review.");
+  function renderCauses(grid, causes) {
+    if (!grid) return;
+    const rows = mergeCauseRows(causes || []);
+    grid.classList.remove("grid-3");
+    grid.style.display = "grid";
+    grid.style.gridTemplateColumns = "repeat(auto-fit,minmax(245px,1fr))";
+    grid.style.gap = "1rem";
+    grid.innerHTML = rows.map(renderCauseCard).join("");
+  }
 
-    const history = document.querySelector("#dtab-history tbody");
-    if (history) history.innerHTML = `<tr><td colspan="7">Your real token activity will appear here.</td></tr>`;
+  function renderCauseCard(cause) {
+    const raised = Number(cause.raised || 0);
+    const goal = Number(cause.goal || 0);
+    const contributors = Number(cause.contributors || 0);
+    const hasActivity = Boolean(cause.hasRealActivity || raised > 0 || contributors > 0);
+    const pct = hasActivity && goal > 0 ? Math.min(100, Math.round((raised / goal) * 100)) : 0;
+
+    return `
+      <article class="premium-cause-card">
+        <div class="cause-visual ${cause.accent}">
+          <span class="cause-chip" style="position:absolute;top:12px;left:12px;">${escapeHtml(cause.eyebrow)}</span>
+          <span class="art">${cause.icon}</span>
+        </div>
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;margin-bottom:.5rem;">
+          <h3 style="font-size:1.12rem;font-weight:850;line-height:1.2;margin:0;">${escapeHtml(cause.title)}</h3>
+          <span class="token-chip">SM</span>
+        </div>
+        <p style="font-size:.88rem;color:var(--text2);line-height:1.65;margin:.25rem 0 1rem;">${escapeHtml(cause.description)}</p>
+        ${hasActivity ? `
+          <div class="cause-meta"><span>Real community activity</span><strong>${compactNumber(raised, { money: true })}</strong></div>
+          <div class="premium-progress"><span style="width:${pct}%"></span></div>
+          <div class="cause-footer">
+            <span style="font-size:.8rem;color:var(--text2);">${compactNumber(contributors)} supporters</span>
+            <button class="btn btn-primary" onclick="openDonateModal('${cause.category}')">Support</button>
+          </div>
+        ` : `
+          <div class="cause-empty-state">
+            <div>${escapeHtml(cause.empty || "No community activity yet")}</div>
+            <div style="font-size:.8rem;font-weight:600;margin-top:.25rem;">No community activity yet</div>
+          </div>
+          <div class="cause-footer">
+            <span style="font-size:.8rem;color:var(--text2);">Be the first supporter</span>
+            <button class="btn btn-primary" onclick="openDonateModal('${cause.category}')">Support</button>
+          </div>
+        `}
+      </article>
+    `;
   }
 
   async function loadDashboard() {
-    if (!getToken()) return;
+    if (!getToken()) {
+      renderLoggedOutDashboard();
+      return;
+    }
     try {
       const data = await request("/dashboard");
-      const user = data.user;
-      saveUser(user);
-      updateNav();
-
-      const avatar = document.querySelector(".dash-sidebar .user-avatar");
-      if (avatar) avatar.textContent = initials(user.name);
-      const sidebarName = document.querySelector(".dash-sidebar div[style*='font-weight:700']");
-      if (sidebarName) sidebarName.textContent = user.name || "ServeMATE User";
-      const sidebarBadge = document.querySelector(".dash-sidebar .badge");
-      if (sidebarBadge) sidebarBadge.textContent = user.title || "Beginner";
-      const levelName = document.querySelector(".level-name");
-      if (levelName) levelName.textContent = `Level ${user.level} - ${user.title}`;
-      const xpCount = document.querySelector(".xp-count");
-      if (xpCount) xpCount.textContent = data.progression.nextLevelXp ? `${number(user.xp)} / ${number(data.progression.nextLevelXp)} XP` : `${number(user.xp)} XP`;
-      const fill = document.querySelector(".level-bar .progress-fill");
-      if (fill) fill.style.width = `${Math.min(data.xpProgress || 0, 100)}%`;
-
-      const heading = document.querySelector("#dtab-overview h2");
-      if (heading) heading.textContent = `Welcome, ${user.name || "ServeMATE user"}`;
-      const cards = document.querySelectorAll("#dtab-overview .stat-card");
-      const values = [
-        ["Token Balance", number(user.tokenBalance)],
-        ["XP Points", number(user.xp)],
-        ["Impact Score", number(user.totalImpact)],
-        ["Leaderboard", data.leaderboardPosition ? `#${data.leaderboardPosition}` : "Unranked"],
-      ];
-      cards.forEach((card, index) => {
-        const label = card.querySelector(".label");
-        const valueEl = card.querySelector(".value");
-        const change = card.querySelector(".change");
-        if (label) label.textContent = values[index]?.[0] || "";
-        if (valueEl) valueEl.textContent = values[index]?.[1] || "0";
-        if (change) change.textContent = "From real activity";
-      });
-
-      const activityCard = document.querySelector("#dtab-overview .grid-2 .card:first-child > div");
-      if (activityCard) {
-        activityCard.innerHTML = (data.recentActivity || []).length
-          ? data.recentActivity.map((item) => `<div style="font-size:.88rem;"><strong>${esc(item.message)}</strong><div style="color:var(--text3);font-size:.8rem;">${new Date(item.createdAt).toLocaleString("en-IN")}</div></div>`).join("")
-          : `<p style="color:var(--text2);">No activity yet.</p>`;
-      }
-
-      const tbody = document.querySelector("#dtab-history tbody");
-      if (tbody) {
-        tbody.innerHTML = (data.recentDonations || []).length ? data.recentDonations.map((item) => `
-          <tr>
-            <td><div style="font-weight:600;">${esc(item.cause?.title || "Virtual token contribution")}</div></td>
-            <td style="font-family:'Sora',sans-serif;font-weight:700;">${number(item.amount)} tokens</td>
-            <td style="color:var(--text2);">${new Date(item.createdAt).toLocaleDateString("en-IN")}</td>
-            <td><span class="ngo-badge">${esc(item.ngo?.ngoName || item.ngo?.name || "Pending assignment")}</span></td>
-            <td style="color:var(--text2);font-size:.82rem;">${esc(item.ngo?.location || item.location || "-")}</td>
-            <td>${item.proofVideo ? `<a href="${esc(item.proofVideo)}" target="_blank" class="proof-btn">View</a>` : "-"}</td>
-            <td><span class="badge badge-blue">${esc(item.status)}</span></td>
-          </tr>
-        `).join("") : `<tr><td colspan="7">No token contributions yet.</td></tr>`;
-      }
-
-      const badges = document.querySelector(".badges-grid");
-      if (badges) {
-        badges.innerHTML = (user.badges || []).length
-          ? user.badges.map((badge) => `<div class="badge-item earned"><div class="b-icon">+</div><div class="b-name">${esc(badge)}</div></div>`).join("")
-          : `<p style="color:var(--text2);">Badges unlock from real XP and token activity.</p>`;
-      }
+      state.dashboard = data;
+      state.auth.user = data.user;
+      localStorage.setItem(userKey, JSON.stringify(data.user));
+      renderDashboard(data);
     } catch (err) {
-      toast(`Dashboard unavailable: ${err.message}`);
+      notify(`Dashboard unavailable: ${err.message}`);
+      renderLoggedOutDashboard();
     }
+  }
+
+  function renderLoggedOutDashboard() {
+    const historyBody = document.querySelector("#dtab-history tbody");
+    if (historyBody) historyBody.innerHTML = `<tr><td colspan="7"><div class="empty-panel">Login to see your real donation history.</div></td></tr>`;
+    const activity = recentActivityCard();
+    if (activity) activity.innerHTML = `<h4 style="font-weight:700;margin-bottom:1rem;">Recent Activity</h4><div class="empty-panel">No community activity yet.</div>`;
+    const badgeGrid = document.querySelector("#dtab-badges .badges-grid");
+    if (badgeGrid) badgeGrid.innerHTML = `<div class="empty-panel" style="grid-column:1/-1;">Badges appear after verified activity.</div>`;
+  }
+
+  function renderDashboard(data) {
+    const user = data.user || {};
+    const progression = data.progression || {};
+    const displayTitle = `${progression.titleIcon || ""} ${user.title || progression.title || "Beginner"}`.trim();
+
+    const avatar = document.querySelector(".dash-sidebar .user-avatar");
+    if (avatar) avatar.textContent = initials(user.name);
+    const sidebarName = document.querySelector(".dash-sidebar div[style*='font-weight:700']");
+    if (sidebarName) sidebarName.textContent = user.name || "ServeMate User";
+    const sidebarBadge = document.querySelector(".dash-sidebar .badge");
+    if (sidebarBadge) sidebarBadge.textContent = displayTitle;
+    const levelName = document.querySelector(".level-name");
+    if (levelName) levelName.textContent = `Level ${user.level || progression.level || 1} - ${user.title || progression.title || "Beginner"}`;
+    const xpCount = document.querySelector(".xp-count");
+    if (xpCount) xpCount.textContent = `${compactNumber(user.xp)} / ${compactNumber(progression.nextLevelXp)} XP`;
+    const fill = document.querySelector(".level-bar .progress-fill");
+    if (fill) fill.style.width = `${progression.progress || 0}%`;
+    const remaining = document.querySelector(".level-bar div[style*='font-size:.75rem']");
+    if (remaining) remaining.textContent = `${compactNumber(progression.xpRemaining)} XP to next level`;
+
+    const greeting = document.querySelector("#dtab-overview h2");
+    if (greeting) greeting.textContent = `Good to see you, ${user.name || "friend"}`;
+    const cards = document.querySelectorAll("#dtab-overview .stat-card .value");
+    if (cards[0]) cards[0].textContent = compactNumber(user.totalDonated, { money: true });
+    if (cards[1]) cards[1].textContent = `${compactNumber(user.xp)} XP`;
+    if (cards[2]) cards[2].textContent = compactNumber(user.donationCount);
+    if (cards[3]) cards[3].textContent = `Lv ${user.level || progression.level || 1}`;
+
+    renderOverviewActivity(data.recentDonations || []);
+    renderHistory(data.recentDonations || []);
+    renderBadges(user, progression);
+    renderProgression(progression);
+  }
+
+  function recentActivityCard() {
+    return Array.from(document.querySelectorAll("#dtab-overview .card h4"))
+      .find((h) => h.textContent.includes("Recent Activity"))?.parentElement;
+  }
+
+  function renderOverviewActivity(donations) {
+    const card = recentActivityCard();
+    if (!card) return;
+    if (!donations.length) {
+      card.innerHTML = `<h4 style="font-weight:700;margin-bottom:1rem;">Recent Activity</h4><div class="empty-panel">No community activity yet. Your first verified action will appear here.</div>`;
+      return;
+    }
+    card.innerHTML = `
+      <h4 style="font-weight:700;margin-bottom:1rem;">Recent Activity</h4>
+      <div style="display:flex;flex-direction:column;gap:.75rem;">
+        ${donations.slice(0, 4).map((donation) => `
+          <div style="display:flex;align-items:center;gap:.75rem;font-size:.88rem;">
+            <div style="width:38px;height:38px;border-radius:50%;background:var(--blue-light);display:flex;align-items:center;justify-content:center;flex-shrink:0;">${donation.cause?.icon || "SM"}</div>
+            <div><div style="font-weight:700;">Supported ${escapeHtml(donation.cause?.title || "a verified cause")}</div><div style="color:var(--text3);font-size:.8rem;">${money(donation.amount)} - ${escapeHtml(donation.status || "pending")}</div></div>
+          </div>`).join("")}
+      </div>`;
+  }
+
+  function renderHistory(donations) {
+    const tbody = document.querySelector("#dtab-history tbody");
+    if (!tbody) return;
+    if (!donations.length) {
+      tbody.innerHTML = `<tr><td colspan="7"><div class="empty-panel">No donation history yet. Be the first supporter.</div></td></tr>`;
+      return;
+    }
+    tbody.innerHTML = donations.map((donation) => {
+      const date = donation.createdAt ? new Date(donation.createdAt).toLocaleDateString("en-IN") : "-";
+      const status = donation.status || "pending";
+      const statusClass = status === "verified" ? "badge-green" : status === "completed" ? "badge-blue" : "badge-orange";
+      return `
+        <tr>
+          <td><div style="font-weight:700;">${donation.cause?.icon || "SM"} ${escapeHtml(donation.cause?.title || "Donation")}</div></td>
+          <td style="font-family:'Sora',sans-serif;font-weight:800;">${money(donation.amount)}</td>
+          <td style="color:var(--text2);">${date}</td>
+          <td><span class="ngo-badge">${escapeHtml(donation.ngo?.name || "Pending NGO assignment")}</span></td>
+          <td style="color:var(--text2);font-size:.82rem;">${escapeHtml(donation.ngo?.location || donation.location || "-")}</td>
+          <td>${donation.proofVideo ? `<a href="${escapeHtml(donation.proofVideo)}" class="proof-btn" target="_blank">Watch</a>` : `<span style="color:var(--text3);">Awaiting proof</span>`}</td>
+          <td><span class="badge ${statusClass}">${escapeHtml(status)}</span></td>
+        </tr>`;
+    }).join("");
+  }
+
+  function renderBadges(user, progression) {
+    const progressCard = document.querySelector("#dtab-badges .card");
+    if (progressCard) {
+      progressCard.innerHTML = `
+        <div class="title-card" style="background:${progression.titleGradient || "linear-gradient(135deg,#22c55e,#2563eb)"};">
+          <div style="font-size:.8rem;opacity:.82;font-weight:800;">Current Title</div>
+          <div style="font-size:1.45rem;font-weight:900;margin:.2rem 0;">${progression.titleIcon || "\u{1F331}"} ${escapeHtml(user.title || progression.title || "Beginner")}</div>
+          <div style="font-size:.85rem;opacity:.9;">Level ${user.level || progression.level || 1} - ${compactNumber(user.xp)} XP</div>
+        </div>
+        <div style="font-size:.85rem;color:var(--text2);margin:1rem 0 .65rem;">${compactNumber(progression.xpIntoLevel)} / ${compactNumber(progression.xpForNextLevel)} XP in this level</div>
+        <div class="premium-progress" style="height:12px;"><span style="width:${progression.progress || 0}%"></span></div>`;
+    }
+    const badgeGrid = document.querySelector("#dtab-badges .badges-grid");
+    if (!badgeGrid) return;
+    const badges = user.badges || [];
+    if (!badges.length) {
+      badgeGrid.innerHTML = `<div class="empty-panel" style="grid-column:1/-1;">Badges are empty for now. Real achievements will appear after verified activity.</div>`;
+      return;
+    }
+    badgeGrid.innerHTML = badges.map((badge) => `<div class="badge-item earned"><div class="b-icon">\u{1F3C5}</div><div class="b-name">${escapeHtml(badge)}</div></div>`).join("");
+  }
+
+  function renderProgression(progression) {
+    const path = document.querySelector("#dtab-gamification .level-path");
+    if (!path) return;
+    const currentLevel = progression.level || 1;
+    path.innerHTML = (progression.ranks || []).map((rank) => {
+      const done = currentLevel > rank.maxLevel;
+      const current = currentLevel >= rank.minLevel && currentLevel <= rank.maxLevel;
+      return `<div class="level-node ${done ? "done" : ""} ${current ? "current" : ""}">
+        <div class="l-icon">${rank.icon}</div>
+        <div class="l-name">${escapeHtml(rank.title)}</div>
+        <div class="l-xp">Level ${rank.minLevel}${Number.isFinite(rank.maxLevel) ? `-${rank.maxLevel}` : "+"}</div>
+      </div>`;
+    }).join("");
   }
 
   async function loadLeaderboard(type = "donors") {
-    const target = document.getElementById(type === "ngos" ? "lb-ngos" : "lb-donors");
-    if (!target) return;
     try {
       const rows = await request(`/leaderboard/${type}`);
-      if (!Array.isArray(rows) || rows.length === 0) {
-        target.innerHTML = emptyState("No rankings yet", "Rankings appear after real token activity exists.");
-        return;
+      state.leaderboard[type] = rows;
+      renderLeaderboard(type, rows);
+    } catch (_) {
+      renderLeaderboard(type, []);
+    }
+  }
+
+  function renderLeaderboard(type, rows) {
+    const target = document.getElementById(type === "ngos" ? "lb-ngos" : "lb-donors");
+    if (!target) return;
+    if (!Array.isArray(rows) || rows.length === 0) {
+      target.innerHTML = `<div class="empty-panel">No community activity yet. Be the first supporter.</div>`;
+      return;
+    }
+    target.innerHTML = rows.map((row, index) => {
+      const rank = index === 0 ? "\u{1F947}" : index === 1 ? "\u{1F948}" : index === 2 ? "\u{1F949}" : String(index + 1);
+      if (type === "ngos") {
+        return `<div class="lb-row">
+          <div class="lb-rank">${rank}</div>
+          <div class="lb-avatar">${initials(row.name)}</div>
+          <div class="flex-1"><div class="lb-name">${escapeHtml(row.name || "NGO")} <span class="verified-tick">✓</span></div><div class="lb-location">${escapeHtml(row.areaOfWork || row.location || "Verified NGO")}</div></div>
+          <div style="text-align:right;"><div class="lb-xp">Impact: ${compactNumber(row.impactScore)}</div><div class="lb-count">${compactNumber(row.tasksCompleted)} tasks</div></div>
+        </div>`;
       }
-      target.innerHTML = rows.map((row, index) => {
-        const name = row.ngoName || row.name || row.username || "ServeMATE member";
-        return `
-          <div class="lb-row">
-            <div class="lb-rank">${index + 1}</div>
-            <div class="lb-avatar">${initials(name)}</div>
-            <div class="flex-1">
-              <div class="lb-name">${esc(name)}</div>
-              <div class="lb-location">${esc(row.title || row.location || row.areaOfWork || "")}</div>
-              <div>${(row.badges || []).slice(0, 3).map((badge) => `<span class="badge badge-blue" style="font-size:.7rem;">${esc(badge)}</span>`).join(" ")}</div>
-            </div>
-            <div style="text-align:right;">
-              <div class="lb-xp">${number(row.xp || row.impactScore || 0)} ${type === "ngos" ? "impact" : "XP"}</div>
-              <div class="lb-count">${type === "ngos" ? `${number(row.tasksCompleted || 0)} tasks` : `${number(row.totalTokensPurchased || 0)} tokens`}</div>
-            </div>
-          </div>
-        `;
-      }).join("");
-    } catch (err) {
-      target.innerHTML = emptyState("Leaderboard unavailable", err.message);
-    }
+      const progression = row.progression || {};
+      return `<div class="lb-row">
+        <div class="lb-rank">${rank}</div>
+        <div class="lb-avatar">${row.avatar ? "" : initials(row.name)}</div>
+        <div class="flex-1"><div class="lb-name">${escapeHtml(row.name || "Supporter")}</div><div class="lb-location"><span class="rank-chip" style="background:${progression.titleGradient || "linear-gradient(135deg,#22c55e,#2563eb)"}">${progression.titleIcon || "\u{1F331}"} ${escapeHtml(row.title || progression.title || "Beginner")}</span></div></div>
+        <div style="text-align:right;"><div class="lb-xp">${compactNumber(row.xp)} XP</div><div class="lb-count">${compactNumber(row.donationCount)} donations</div></div>
+      </div>`;
+    }).join("");
   }
 
-  async function loadNGOs() {
-    const grid = document.querySelector("#page-ngos .grid-3");
-    if (!grid) return;
-    try {
-      const ngos = await request("/ngos");
-      grid.innerHTML = ngos.length ? ngos.map((ngo, index) => `
-        <div class="card ngo-card">
-          <div class="ngo-rank">#${index + 1}</div>
-          <div class="ngo-avatar">${initials(ngo.ngoName || ngo.name)}</div>
-          <div class="ngo-name">${esc(ngo.ngoName || ngo.name)} <span class="verified-tick" title="Approved NGO">Verified</span></div>
-          <div style="font-size:.82rem;color:var(--text2);margin-bottom:.5rem;">${esc(ngo.location || "")}</div>
-          <p style="font-size:.85rem;color:var(--text2);line-height:1.6;">${esc(ngo.description || "No public description yet.")}</p>
-          <div class="ngo-stat-row">
-            <div class="ngo-stat"><div class="n">${number(ngo.tasksCompleted || 0)}</div><div class="l">Tasks</div></div>
-            <div class="ngo-stat"><div class="n">${number((ngo.volunteers || []).length || ngo.volunteerCount || 0)}</div><div class="l">Volunteers</div></div>
-            <div class="ngo-stat"><div class="n">${number(ngo.impactScore || 0)}</div><div class="l">Impact</div></div>
-          </div>
-        </div>
-      `).join("") + `
-        <div class="card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;min-height:220px;border-style:dashed;cursor:pointer;" onclick="openNGORegModal()">
-          <h4 style="font-weight:700;margin-bottom:.35rem;">Register Your NGO</h4>
-          <p style="font-size:.85rem;color:var(--text2);">Applications appear publicly only after admin approval.</p>
-        </div>` : emptyState("No approved NGOs yet", "NGO applications are hidden until admin approval.");
-    } catch (err) {
-      grid.innerHTML = emptyState("NGOs unavailable", err.message);
-    }
-  }
-
-  function ensureAdminPage() {
-    if (document.getElementById("page-admin")) return;
-    document.body.insertAdjacentHTML("beforeend", `
-      <div id="page-admin" class="page">
-        <section style="background:var(--bg2);padding:3rem 2rem 2rem;">
-          <div class="container" style="display:flex;justify-content:space-between;align-items:flex-end;gap:1rem;flex-wrap:wrap;">
-            <div>
-              <div class="section-label">Admin</div>
-              <h2 class="section-title">ServeMATE Control Center</h2>
-              <p class="section-sub">Moderate NGOs, users, transactions, messages, badges, and platform analytics from live platform activity.</p>
-            </div>
-            <button class="btn btn-primary" onclick="ServeMATE.reloadAdmin()">Refresh</button>
-          </div>
-        </section>
-        <section style="padding-top:2rem;">
-          <div class="container">
-            <div id="admin-root">${emptyState("Loading admin", "Fetching live platform activity.")}</div>
-          </div>
-        </section>
-      </div>
-    `);
-  }
-
-  function adminTable(headers, rows, emptyMessage) {
-    if (!rows || !rows.length) return `<p style="color:var(--text2);font-size:.9rem;">${esc(emptyMessage)}</p>`;
-    return `<div style="overflow:auto;"><table class="history-table"><thead><tr>${headers.map((h) => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table></div>`;
-  }
-
-  async function loadAdmin() {
-    ensureAdminPage();
-    const root = document.getElementById("admin-root");
-    const user = savedUser();
-    if (!root) return;
-    if (user?.role !== "admin") {
-      root.innerHTML = emptyState("Admin access required", "Sign in with the configured admin account to manage ServeMATE.");
-      return;
-    }
-    try {
-      root.innerHTML = emptyState("Loading admin", "Fetching live platform activity.");
-      const [overview, pending, allNgos, users, transactions, contacts, analytics] = await Promise.all([
-        request("/admin/overview"),
-        request("/admin/ngos/pending"),
-        request("/admin/ngos/all"),
-        request("/admin/users?limit=25"),
-        request("/admin/transactions?limit=25"),
-        request("/admin/contacts"),
-        request("/admin/analytics"),
-      ]);
-      const ngoRows = (allNgos.ngos || allNgos || []).map((ngo) => `
-        <tr>
-          <td><strong>${esc(ngo.ngoName || ngo.name)}</strong><div style="color:var(--text3);font-size:.78rem;">${esc(ngo.email)}</div></td>
-          <td>${esc(ngo.location || "-")}</td>
-          <td><span class="badge ${ngo.approvalStatus === "approved" ? "badge-green" : ngo.approvalStatus === "rejected" ? "badge-purple" : "badge-orange"}">${esc(ngo.approvalStatus || "pending")}</span></td>
-          <td>${ngo.verified ? "Verified" : "Unverified"}</td>
-          <td style="white-space:nowrap;">
-            <button class="btn btn-primary btn-sm" onclick="ServeMATE.adminApproveNGO('${ngo._id}')">Approve</button>
-            <button class="btn btn-ghost btn-sm" onclick="ServeMATE.adminVerifyNGO('${ngo._id}')">Verify</button>
-            <button class="btn btn-ghost btn-sm" onclick="ServeMATE.adminRejectNGO('${ngo._id}')">Reject</button>
-            <button class="btn btn-ghost btn-sm" onclick="ServeMATE.adminDeleteNGO('${ngo._id}')">Remove</button>
-          </td>
-        </tr>`);
-      const userRows = (users.users || []).map((item) => `
-        <tr>
-          <td><strong>${esc(item.name)}</strong><div style="color:var(--text3);font-size:.78rem;">${esc(item.email)}</div></td>
-          <td>${esc(item.role)}</td>
-          <td>${number(item.xp || 0)}</td>
-          <td>${number(item.tokenBalance || 0)}</td>
-          <td>${esc(item.title || "Beginner")}</td>
-          <td><button class="btn btn-ghost btn-sm" onclick="ServeMATE.adminDeleteUser('${item._id}')">Delete</button></td>
-        </tr>`);
-      const txRows = (transactions.transactions || []).map((tx) => `
-        <tr>
-          <td>${esc(tx.userId?.email || "-")}</td>
-          <td>${number(tx.amount)} tokens</td>
-          <td>${esc(tx.type)}</td>
-          <td>${esc(tx.paymentStatus)}</td>
-          <td>${tx.createdAt ? new Date(tx.createdAt).toLocaleString() : "-"}</td>
-        </tr>`);
-      const contactRows = (contacts || []).slice(0, 25).map((msg) => `
-        <tr>
-          <td><strong>${esc(msg.subject)}</strong><div style="color:var(--text3);font-size:.78rem;">${esc(msg.name)} · ${esc(msg.email)}</div></td>
-          <td>${esc((msg.message || "").slice(0, 120))}</td>
-          <td>${msg.read ? "Read" : "Unread"}</td>
-          <td><button class="btn btn-ghost btn-sm" onclick="ServeMATE.adminMarkContactRead('${msg._id}')">Mark read</button></td>
-        </tr>`);
-      root.innerHTML = `
-        <div class="stat-cards">
-          <div class="stat-card"><div class="label">Users</div><div class="value">${number(overview.totalUsers)}</div><div class="change">${number(analytics.usersToday || 0)} today</div></div>
-          <div class="stat-card"><div class="label">Approved NGOs</div><div class="value">${number(overview.verifiedNGOs)}</div><div class="change">${number(overview.pendingNGOs)} pending</div></div>
-          <div class="stat-card"><div class="label">Token Purchases</div><div class="value">${number(overview.totalTokenPurchases || 0)}</div><div class="change">Virtual support tokens only</div></div>
-          <div class="stat-card"><div class="label">Unread Messages</div><div class="value">${number(overview.unreadMessages)}</div><div class="change">Contact inbox</div></div>
-        </div>
-        <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin:1.5rem 0;">
-          <button class="btn btn-primary btn-sm" onclick="ServeMATE.adminRecalculateLeaderboard()">Recalculate Leaderboard</button>
-          <button class="btn btn-ghost btn-sm" onclick="ServeMATE.adminCreateBadge()">Create Badge</button>
-          <button class="btn btn-ghost btn-sm" onclick="ServeMATE.adminSendAnnouncement()">Send Announcement</button>
-        </div>
-        <div class="grid-2">
-          <div class="card" style="grid-column:1 / -1;"><h4>NGO Moderation</h4>${adminTable(["NGO", "Location", "Status", "Verification", "Actions"], ngoRows, "No NGO applications yet.")}</div>
-          <div class="card" style="grid-column:1 / -1;"><h4>Users</h4>${adminTable(["User", "Role", "XP", "Tokens", "Title", "Action"], userRows, "No users found.")}</div>
-          <div class="card" style="grid-column:1 / -1;"><h4>Token Transactions</h4>${adminTable(["User", "Amount", "Type", "Status", "Created"], txRows, "No token transactions yet.")}</div>
-          <div class="card" style="grid-column:1 / -1;"><h4>Contact Messages</h4>${adminTable(["Message", "Preview", "Status", "Action"], contactRows, "No contact messages yet.")}</div>
-        </div>
-      `;
-    } catch (err) {
-      root.innerHTML = emptyState("Admin unavailable", err.message);
-    }
-  }
-  async function ensureRazorpayScript() {
-    if (window.Razorpay) return;
-    await new Promise((resolve, reject) => {
-      const script = document.createElement("script");
-      script.src = "https://checkout.razorpay.com/v1/checkout.js";
-      script.onload = resolve;
-      script.onerror = reject;
-      document.head.appendChild(script);
+  function renderAuthShell() {
+    const user = state.auth.user;
+    Array.from(document.querySelectorAll("button")).filter((button) => /login/i.test(button.textContent)).forEach((button) => {
+      if (!user) return;
+      button.textContent = "Logout";
+      button.onclick = () => {
+        localStorage.removeItem(tokenKey);
+        localStorage.removeItem(userKey);
+        state.auth = { token: null, user: null };
+        location.reload();
+      };
     });
   }
 
-  function selectedTokenAmount() {
-    const input = document.getElementById("custom-amount");
-    const raw = input?.value ? Number(input.value) : Number(window.currentDonateAmount || 0);
-    const amount = Math.floor(raw);
-    return Number.isFinite(amount) && amount > 0 ? amount : 0;
+  function notify(message) {
+    state.notifications.push({ message, at: new Date().toISOString() });
+    if (typeof window.showToast === "function") window.showToast(message);
   }
 
-  function setTokenActionBusy(isBusy, message = "Processing...") {
-    const button = document.querySelector("#donate-step1 .btn-primary.btn-full");
-    if (!button) return;
-    button.disabled = isBusy;
-    button.textContent = isBusy ? message : "Continue";
-  }
-
-  async function refreshUserSurfaces() {
-    const dashboardOpen = document.getElementById("page-dashboard")?.classList.contains("active");
-    if (dashboardOpen) await loadDashboard();
-    loadStats();
-    loadLeaderboard("donors");
-  }
-
-  async function purchaseTokens(amount) {
-    const user = savedUser();
-    if (!user) {
-      window.openAuthModal?.();
-      return;
-    }
-    if (!Number.isFinite(Number(amount)) || Number(amount) < 10) {
-      toast("Minimum token purchase is 10 tokens.");
-      return;
-    }
-    setTokenActionBusy(true, "Opening checkout...");
-    const order = await request("/tokens/order", { method: "POST", body: { amount, currencyAmount: amount } });
-    await ensureRazorpayScript();
-    const checkout = new window.Razorpay({
-      key: order.keyId,
-      amount: order.amount,
-      currency: order.currency,
-      name: "ServeMATE",
-      description: `${order.tokens} virtual support tokens`,
-      order_id: order.orderId,
-      prefill: { name: user.name, email: user.email },
-      handler: async (payment) => {
-        setTokenActionBusy(true, "Verifying payment...");
-        const result = await request("/tokens/verify", {
-          method: "POST",
-          body: { transactionId: order.transactionId, ...payment },
-        });
-        saveUser(result.user);
-        updateNav();
-        toast("Tokens credited successfully.");
-        await refreshUserSurfaces();
-        setTokenActionBusy(false);
-      },
-      modal: { ondismiss: () => setTokenActionBusy(false) },
-    });
-    checkout.open();
-  }
-
-  window.ServeMATE = {
+  window.BackendService = {
     request,
-    openRegister() {
-      window.openAuthModal?.();
-      window.switchAuthTab?.("register", document.querySelector("#auth-modal .tab-btn:nth-child(2)"));
-    },
-    logout() {
-      clearToken();
-      clearUser();
-      updateNav();
-      window.showPage?.("home");
-    },
-    async adminApproveNGO(id) {
-      await request(`/admin/ngos/${id}/approve`, { method: "PATCH", body: {} });
-      toast("NGO approved.");
-      loadAdmin();
-      loadNGOs();
-    },
-    async adminRejectNGO(id) {
-      const reason = prompt("Reason for rejection?") || "";
-      await request(`/admin/ngos/${id}/reject`, { method: "PATCH", body: { reason } });
-      toast("NGO rejected.");
-      loadAdmin();
-    },
-    async adminVerifyNGO(id) {
-      await request(`/admin/ngos/${id}/verify`, { method: "PATCH", body: {} });
-      toast("NGO verified.");
-      loadAdmin();
-      loadNGOs();
-    },
-    async adminDeleteNGO(id) {
-      if (!confirm("Remove this NGO record?")) return;
-      await request(`/admin/ngos/${id}`, { method: "DELETE" });
-      toast("NGO removed.");
-      loadAdmin();
-      loadNGOs();
-    },
-    async adminDeleteUser(id) {
-      if (!confirm("Delete this user account?")) return;
-      await request(`/admin/users/${id}`, { method: "DELETE" });
-      toast("User deleted.");
-      loadAdmin();
-    },
-    async adminMarkContactRead(id) {
-      await request(`/admin/contacts/${id}/read`, { method: "PATCH", body: {} });
-      toast("Message marked read.");
-      loadAdmin();
-    },
-    async adminRecalculateLeaderboard() {
-      await request("/admin/leaderboard/recalculate", { method: "PATCH", body: {} });
-      toast("Leaderboard recalculated.");
-      loadAdmin();
-      loadLeaderboard("donors");
-    },
-    async adminCreateBadge() {
-      const name = prompt("Badge name");
-      if (!name) return;
-      const key = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-      const description = prompt("Badge description") || "";
-      await request("/admin/badges", { method: "POST", body: { key, name, description } });
-      toast("Badge created.");
-      loadAdmin();
-    },
-    async adminSendAnnouncement() {
-      const title = prompt("Announcement title");
-      if (!title) return;
-      const message = prompt("Announcement message") || "";
-      await request("/admin/announcements", { method: "POST", body: { title, message } });
-      toast("Announcement sent.");
-      loadAdmin();
-    },
-    reloadAdmin: loadAdmin,
-    purchaseTokens,
+    login: (email, password) => request("/auth/login", { method: "POST", body: { email, password } }).then((data) => (setSession(data), data)),
+    register: (name, email, password) => request("/auth/register", { method: "POST", body: { name, email, password } }).then((data) => (setSession(data), data)),
+    donate: (amount, cause) => request("/donate", { method: "POST", body: { amount, cause } }),
+    registerNGO: (payload) => request("/auth/ngo/register", { method: "POST", body: payload }),
+    updateProfile: (payload) => request("/profile", { method: "PATCH", body: payload }),
+    volunteer: (ngoId, payload = {}) => request(`/ngos/${ngoId}/volunteers`, { method: "POST", body: payload }),
   };
 
   window.loginAction = async function loginAction() {
@@ -616,62 +490,41 @@
     try {
       if (activeTab === "Login") {
         const root = document.getElementById("auth-login");
-        const data = await request("/auth/login", { method: "POST", body: { email: value('input[type="email"]', root), password: value('input[type="password"]', root) } });
-        setToken(data.token);
-        saveUser(data.user);
-        closeModal("auth-modal");
-        updateNav();
-        window.showPage?.("dashboard");
-        return;
+        await BackendService.login(value('input[type="email"]', root), value('input[type="password"]', root));
+      } else {
+        const root = document.getElementById("auth-register");
+        await BackendService.register(value('input[type="text"]', root), value('input[type="email"]', root), value('input[type="password"]', root));
       }
-      const root = document.getElementById("auth-register");
-      const data = await request("/auth/register", {
-        method: "POST",
-        body: { name: value('input[type="text"]', root), email: value('input[type="email"]', root), password: value('input[type="password"]', root) },
-      });
-      setToken(data.token);
-      saveUser(data.user);
       closeModal("auth-modal");
-      updateNav();
-      window.showPage?.("dashboard");
+      await loadDashboard();
+      showPage("dashboard");
+      notify("Account synced.");
     } catch (err) {
-      toast(`Authentication failed: ${err.message}`);
+      notify(`Authentication failed: ${err.message}`);
     }
   };
 
   window.showDonateSuccess = async function showDonateSuccess() {
+    if (!getToken()) {
+      notify("Please login before supporting a cause.");
+      openAuthModal();
+      return;
+    }
+    const custom = value("#custom-amount");
+    const selected = document.querySelector(".amount-btn.active")?.textContent || "";
+    const amount = custom ? Number(custom) : Number(selected.replace(/[^\d]/g, "")) || 50;
+    const cause = value("#donate-cause");
     try {
-      if (!getToken()) {
-        toast("Please log in before using support tokens.");
-        openAuthModal();
-        return;
-      }
-      const amount = selectedTokenAmount();
-      if (!amount) {
-        toast("Enter a valid positive token amount.");
-        return;
-      }
-      const user = savedUser();
-      if ((user?.tokenBalance || 0) < amount) {
-        toast("Opening secure checkout to buy virtual support tokens.");
-        await purchaseTokens(amount);
-        return;
-      }
-      if (!value("#donate-cause")) {
-        toast("No active cause is available for token spending yet.");
-        return;
-      }
-      setTokenActionBusy(true, "Using tokens...");
-      const result = await request("/contribute", { method: "POST", body: { amount, cause: value("#donate-cause") } });
-      saveUser(result.user);
-      document.getElementById("success-amount").textContent = `${number(amount)} tokens`;
+      const result = await BackendService.donate(amount, cause);
+      state.payment.lastDonation = result.donation;
+      document.getElementById("success-amount").textContent = money(result.donation?.amount || amount);
+      const xpBadge = document.querySelector("#donate-step2 .badge");
+      if (xpBadge) xpBadge.textContent = `+${compactNumber(result.donation?.xpEarned || amount)} XP`;
       document.getElementById("donate-step1").style.display = "none";
       document.getElementById("donate-step2").style.display = "";
-      await refreshUserSurfaces();
-      setTokenActionBusy(false);
+      await Promise.all([loadDashboard(), loadCauses(), loadLeaderboard("donors")]);
     } catch (err) {
-      setTokenActionBusy(false);
-      toast(`Token action failed: ${err.message}`);
+      notify(`Donation failed: ${err.message}`);
     }
   };
 
@@ -683,68 +536,32 @@
     loadLeaderboard(type);
   };
 
-  window.submitContactForm = async function submitContactForm() {
-    const root = document.getElementById("page-contact");
-    try {
-      await request("/contact", {
-        method: "POST",
-        body: {
-          name: value('input[type="text"]', root),
-          email: value('input[type="email"]', root),
-          subject: value("select", root),
-          message: value("textarea", root),
-          website: value('input[name="website"]', root),
-        },
-      });
-      root.querySelectorAll("input, textarea").forEach((field) => (field.value = ""));
-      toast("Message sent.");
-    } catch (err) {
-      toast(`Message failed: ${err.message}`);
-    }
-  };
-
-  window.submitNGOApplication = async function submitNGOApplication() {
-    const root = document.getElementById("ngo-modal");
-    const inputs = root.querySelectorAll("input");
-    try {
-      await request("/auth/ngo/register", {
-        method: "POST",
-        body: {
-          ngoName: inputs[0]?.value?.trim(),
-          founderName: inputs[2]?.value?.trim(),
-          email: inputs[3]?.value?.trim(),
-          phone: inputs[4]?.value?.trim(),
-          location: inputs[5]?.value?.trim(),
-          volunteerCount: inputs[6]?.value?.trim(),
-          regNumber: inputs[1]?.value?.trim(),
-          description: value("textarea", root),
-        },
-      });
-      closeModal("ngo-modal");
-      toast("NGO application submitted for admin review.");
-    } catch (err) {
-      toast(`NGO application failed: ${err.message}`);
-    }
+  window.openUserProfile = function openUserProfile(id) {
+    const user = (state.leaderboard.donors || []).find((row) => row._id === id || row.id === id || row.name === id) || state.auth.user;
+    if (!user) return;
+    const progression = user.progression || {};
+    document.getElementById("upm-avatar").textContent = initials(user.name);
+    document.getElementById("upm-avatar").style.background = progression.titleGradient || "linear-gradient(135deg,var(--blue),var(--orange))";
+    document.getElementById("upm-name").textContent = user.name || "Supporter";
+    document.getElementById("upm-sub").textContent = `Level ${user.level || progression.level || 1} | ${user.title || progression.title || "Beginner"} | ${compactNumber(user.xp)} XP`;
+    document.getElementById("upm-stats").innerHTML = [
+      { n: compactNumber(user.totalDonated, { money: true }), l: "Total Donated" },
+      { n: compactNumber(user.xp), l: "XP" },
+      { n: compactNumber(user.donationCount), l: "Donations" },
+      { n: user.title || progression.title || "Beginner", l: "Title" },
+    ].map((s) => `<div class="pm-stat"><div class="n">${escapeHtml(s.n)}</div><div class="l">${escapeHtml(s.l)}</div></div>`).join("");
+    document.getElementById("upm-badges").innerHTML = (user.badges || []).length
+      ? user.badges.map((badge) => `<span class="badge badge-blue">${escapeHtml(badge)}</span>`).join("")
+      : `<div class="empty-panel">No achievements yet.</div>`;
+    document.getElementById("upm-history").innerHTML = `<div class="title-card" style="background:${progression.titleGradient || "linear-gradient(135deg,#22c55e,#2563eb)"};"><div style="font-size:1.25rem;font-weight:900;">${progression.titleIcon || "\u{1F331}"} ${escapeHtml(user.title || progression.title || "Beginner")}</div><div>Real XP based rank</div></div>`;
+    openModal("user-profile-modal");
   };
 
   document.addEventListener("DOMContentLoaded", async () => {
-    ensureAdminPage();
-    clearFakeSections();
-    patchShowPage();
-
-    const contactButton = document.querySelector("#page-contact .card button");
-    if (contactButton) contactButton.onclick = submitContactForm;
-    const ngoButton = document.querySelector("#ngo-modal .btn-orange");
-    if (ngoButton) ngoButton.onclick = submitNGOApplication;
-
-    await restoreSession();
-    updateNav();
-    loadStats();
-    loadCauses();
-    loadLeaderboard("donors");
-    loadNGOs();
-    if (document.getElementById("page-dashboard")?.classList.contains("active")) loadDashboard();
+    injectStyles();
+    window.ServeMateState = state;
+    clearDemoShell();
+    renderAuthShell();
+    await Promise.all([loadStats(), loadCauses(), loadDashboard(), loadLeaderboard("donors")]);
   });
 })();
-
-

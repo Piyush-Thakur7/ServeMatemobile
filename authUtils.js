@@ -1,11 +1,15 @@
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
-const { User, ADMIN_EMAIL } = require("./models");
+const { User } = require("./models");
+
+const ADMIN_EMAIL = "th.piyushsingh2007@gmail.com";
 
 let jwtSecret = process.env.JWT_SECRET;
 if (!jwtSecret) {
   jwtSecret = crypto.randomBytes(32).toString("hex");
-  console.warn("[auth] JWT_SECRET is not set. Using an in-memory fallback; set JWT_SECRET in production.");
+  console.warn(
+    "[auth] JWT_SECRET is not set. Using an in-memory fallback; set JWT_SECRET in production so tokens survive restarts."
+  );
 }
 
 function signToken(user) {
@@ -30,7 +34,7 @@ async function authMiddleware(req, res, next) {
     req.user = jwt.verify(auth.slice(7), jwtSecret);
     return next();
   } catch (err) {
-    return res.status(401).json({ error: "Invalid or expired token", code: "TOKEN_EXPIRED" });
+    return res.status(401).json({ error: "Invalid or expired token" });
   }
 }
 

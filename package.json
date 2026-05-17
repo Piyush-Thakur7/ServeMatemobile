@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "test": "node --check index.js && node --check authRoutes.js && node --check adminRoutes.js && node --check apiRoutes.js"
+    "test": "node --check index.js && node --check authRoutes.js && node --check adminRoutes.js && node --check apiRoutes.js && node --check authUtils.js && node --check frontendIntegration.js && node --check services/gamificationService.js && node --check services/causeCatalog.js && node --check src/middleware/rateLimit.js"
   },
   "keywords": [],
   "author": "",
