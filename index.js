@@ -45,6 +45,7 @@ app.get("/api/health", (req, res) => {
   res.json({
     status: "ok",
     mongo: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+    version: "auto-route-homepage-donations",
     time: new Date().toISOString(),
   });
 });
