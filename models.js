@@ -88,11 +88,11 @@ const ngoSchema = new mongoose.Schema({
 const causeSchema = new mongoose.Schema({
   title:        { type: String, required: true },
   description:  { type: String, required: true },
-  icon:         { type: String, default: "🌟" },
+  icon:         { type: String, default: "SM" },
   category:     { type: String, enum: ["meals","trees","essentials","ngo-support","education","health","other"], required: true },
   goal:         { type: Number, required: true },
   raised:       { type: Number, default: 0 },
-  impactPerRupee:{ type: String, default: "₹10 = 1 impact unit" },
+  impactPerRupee:{ type: String, default: "Rs 10 = 1 impact unit" },
   active:       { type: Boolean, default: true },
   assignedNgo:  { type: mongoose.Schema.Types.ObjectId, ref: "NGO" },
   contributors: { type: Number, default: 0 },

@@ -13,7 +13,8 @@ const router = express.Router();
 // GET /api/causes  — all active causes (for homepage cards)
 router.get("/causes", async (req, res) => {
   try {
-    const causes = await Cause.find({ active: true })
+    const verifiedNgoIds = await NGO.find({ verified: true }).distinct("_id");
+    const causes = await Cause.find({ active: true, assignedNgo: { $in: verifiedNgoIds } })
       .populate("assignedNgo", "name verified rating")
       .sort({ raised: -1 });
     res.json(mergeCoreCauses(causes));
@@ -38,69 +39,16 @@ router.get("/causes/:id", async (req, res) => {
 //  DONATIONS
 // ════════════════════════════════════════════════════════════════════════════
 
-const CORE_CAUSE_FALLBACKS = {
-  meals: {
-    title: "Meals for All",
-    description: "Provide nutritious meals to underprivileged children and elderly. Rs 10 feeds one person.",
-    icon: "Meals",
-    goal: 100000,
-    impactPerRupee: "Rs 10 feeds 1 person for a day",
-  },
-  trees: {
-    title: "Tree Plantation Drive",
-    description: "Plant trees across urban wastelands and barren hillsides. Rs 50 plants and nurtures one tree.",
-    icon: "Trees",
-    goal: 100000,
-    impactPerRupee: "Rs 50 = 1 tree planted and maintained",
-  },
-  essentials: {
-    title: "Daily Essentials Kit",
-    description: "Distribute hygiene kits and essential supplies to families in need.",
-    icon: "Essentials",
-    goal: 100000,
-    impactPerRupee: "Rs 100 = 1 complete hygiene kit",
-  },
-  "ngo-support": {
-    title: "NGO Community Support",
-    description: "Support verified NGOs with proof uploads, volunteer tools, and community response.",
-    icon: "NGO",
-    goal: 100000,
-    impactPerRupee: "Verified NGO support",
-  },
-};
-
-async function resolveDonationCause(causeId, causeCategory) {
-  const coreCategories = Object.keys(CORE_CAUSE_FALLBACKS);
-  const category = causeCategory || (coreCategories.includes(causeId) ? causeId : null);
-
-  if (causeId && !coreCategories.includes(causeId)) {
-    return Cause.findById(causeId);
-  }
-
-  if (!category || !coreCategories.includes(category)) return null;
-
-  let cause = await Cause.findOne({ category, active: true });
-  if (cause) return cause;
-
-  return Cause.create({
-    ...CORE_CAUSE_FALLBACKS[category],
-    category,
-    raised: 0,
-    contributors: 0,
-    active: true,
-  });
-}
-
 // POST /api/donate - authenticated user donates to a cause
 router.post("/donate", authMiddleware, async (req, res) => {
   try {
-    const { causeId, cause: causeCategory, amount } = req.body;
+    const { causeId, amount } = req.body;
     const safeAmount = Math.floor(Number(amount));
-    if ((!causeId && !causeCategory) || !Number.isFinite(safeAmount) || safeAmount < 10)
+    if (!causeId || !Number.isFinite(safeAmount) || safeAmount < 10)
       return res.status(400).json({ error: "Cause and minimum amount of Rs 10 required" });
-    const cause = await resolveDonationCause(causeId, causeCategory);
-    if (!cause || !cause.active)
-      return res.status(404).json({ error: "Cause not found or inactive" });
+    const cause = await Cause.findOne({ _id: causeId, active: true }).populate("assignedNgo", "verified");
+    if (!cause || !cause.active || !cause.assignedNgo || !cause.assignedNgo.verified)
+      return res.status(404).json({ error: "This cause is not available until an approved NGO is assigned" });
 
     // XP earned = 1 XP per Rs 1 donated (min 10)
     const xpEarned = safeAmount;
@@ -206,7 +154,15 @@ router.get("/donations", authMiddleware, async (req, res) => {
 router.get("/transparency", async (req, res) => {
   try {
     const { cause, ngo, page = 1, limit = 10 } = req.query;
-    const filter = {};
+    const [verifiedNgoIds, verifiedDonationIds] = await Promise.all([
+      NGO.find({ verified: true }).distinct("_id"),
+      Donation.find({ status: "verified", proofVideo: { $nin: ["", null] } }).distinct("_id"),
+    ]);
+    const filter = {
+      ngo: { $in: verifiedNgoIds },
+      donation: { $in: verifiedDonationIds },
+      proofVideo: { $nin: ["", null] },
+    };
     if (cause) filter.cause = cause;
     if (ngo)   filter.ngo   = ngo;
 
@@ -452,8 +408,8 @@ router.get("/stats", async (req, res) => {
   try {
     const [totalDonated, verifiedTasks, verifiedNGOs, totalDonations] =
       await Promise.all([
-        User.aggregate([{ $group: { _id: null, total: { $sum: "$totalDonated" } } }]),
-        Transparency.countDocuments(),
+        Donation.aggregate([{ $match: { status: "verified" } }, { $group: { _id: null, total: { $sum: "$amount" } } }]),
+        Transparency.countDocuments({ proofVideo: { $nin: ["", null] } }),
         NGO.countDocuments({ verified: true }),
         Donation.countDocuments({ status: "verified" })
       ]);

@@ -219,6 +219,7 @@
       state.causes = mergeCauseRows([]);
     }
     renderCauses(grid, state.causes);
+    populateDonationCauses();
   }
 
   function mergeCauseRows(rows) {
@@ -241,6 +242,7 @@
     const goal = Number(cause.goal || 0);
     const contributors = Number(cause.contributors || 0);
     const hasActivity = Boolean(cause.hasRealActivity || raised > 0 || contributors > 0);
+    const canSupport = !cause.isPlaceholder && cause._id && cause.assignedNgo && cause.assignedNgo.verified;
     const pct = hasActivity && goal > 0 ? Math.min(100, Math.round((raised / goal) * 100)) : 0;
 
     return `
@@ -259,7 +261,7 @@
           <div class="premium-progress"><span style="width:${pct}%"></span></div>
           <div class="cause-footer">
             <span style="font-size:.8rem;color:var(--text2);">${compactNumber(contributors)} supporters</span>
-            <button class="btn btn-primary" onclick="openDonateModal('${cause.category}')">Support</button>
+            <button class="btn btn-primary" ${canSupport ? `onclick="openDonateModal('${cause._id}')"` : "disabled"}>${canSupport ? "Support" : "Awaiting approved NGO"}</button>
           </div>
         ` : `
           <div class="cause-empty-state">
@@ -267,13 +269,39 @@
             <div style="font-size:.8rem;font-weight:600;margin-top:.25rem;">No community activity yet</div>
           </div>
           <div class="cause-footer">
-            <span style="font-size:.8rem;color:var(--text2);">Be the first supporter</span>
-            <button class="btn btn-primary" onclick="openDonateModal('${cause.category}')">Support</button>
+            <span style="font-size:.8rem;color:var(--text2);">${canSupport ? "Be the first supporter" : "Admin approval required"}</span>
+            <button class="btn btn-primary" ${canSupport ? `onclick="openDonateModal('${cause._id}')"` : "disabled"}>${canSupport ? "Support" : "Coming soon"}</button>
           </div>
         `}
       </article>
     `;
   }
+
+  function realDonationCauses() {
+    return (state.causes || []).filter((cause) => !cause.isPlaceholder && cause._id && cause.assignedNgo && cause.assignedNgo.verified);
+  }
+
+  function populateDonationCauses(selectedId = "") {
+    const select = document.getElementById("donate-cause");
+    if (!select) return;
+    const causes = realDonationCauses();
+    if (!causes.length) {
+      select.innerHTML = `<option value="">No approved NGO causes available yet</option>`;
+      select.disabled = true;
+      return;
+    }
+    select.disabled = false;
+    select.innerHTML = causes.map((cause) => `<option value="${escapeHtml(cause._id)}">${escapeHtml(cause.title)}${cause.assignedNgo?.name ? ` - ${escapeHtml(cause.assignedNgo.name)}` : ""}</option>`).join("");
+    if (selectedId && causes.some((cause) => String(cause._id) === String(selectedId))) select.value = selectedId;
+  }
+
+  window.openDonateModal = function openDonateModal(causeId = "") {
+    document.getElementById("donate-step1").style.display = "";
+    document.getElementById("donate-step2").style.display = "none";
+    populateDonationCauses(causeId);
+    if (typeof updateImpact === "function") updateImpact();
+    openModal("donate-modal");
+  };
 
   async function loadDashboard() {
     if (!getToken()) {
@@ -468,6 +496,34 @@
         location.reload();
       };
     });
+    ensureAdminNavigation();
+  }
+
+  function ensureAdminNavigation() {
+    const user = state.auth.user || getUser();
+    const adminPage = document.getElementById("page-admin");
+    const nav = document.querySelector(".nav-links");
+    const mobile = document.getElementById("mobile-menu");
+    document.querySelectorAll("[data-admin-nav]").forEach((node) => node.remove());
+    if (!user || user.role !== "admin" || !adminPage) return;
+    if (nav) {
+      const item = document.createElement("li");
+      item.setAttribute("data-admin-nav", "true");
+      item.innerHTML = `<button class="nav-btn btn-nav-cta" onclick="showPage('admin');loadAdminPanel()">Admin Panel</button>`;
+      nav.appendChild(item);
+    }
+    if (mobile) {
+      const button = document.createElement("button");
+      button.setAttribute("data-admin-nav", "true");
+      button.className = "cta";
+      button.textContent = "Admin Panel";
+      button.onclick = () => {
+        closeMobileMenu();
+        showPage("admin");
+        loadAdminPanel();
+      };
+      mobile.appendChild(button);
+    }
   }
 
   function notify(message) {
@@ -479,10 +535,15 @@
     request,
     login: (email, password) => request("/auth/login", { method: "POST", body: { email, password } }).then((data) => (setSession(data), data)),
     register: (name, email, password) => request("/auth/register", { method: "POST", body: { name, email, password } }).then((data) => (setSession(data), data)),
-    donate: (amount, cause) => request("/donate", { method: "POST", body: { amount, cause, causeId: cause } }),
+    donate: (amount, causeId) => request("/donate", { method: "POST", body: { amount, causeId } }),
     registerNGO: (payload) => request("/auth/ngo/register", { method: "POST", body: payload }),
     updateProfile: (payload) => request("/profile", { method: "PATCH", body: payload }),
     volunteer: (ngoId, payload = {}) => request(`/ngos/${ngoId}/volunteers`, { method: "POST", body: payload }),
+    adminOverview: () => request("/admin/overview"),
+    adminPendingNgos: () => request("/admin/ngos/pending"),
+    adminUsers: () => request("/admin/users"),
+    adminResetUser: (id) => request(`/admin/users/${id}/reset-activity`, { method: "POST", body: {} }),
+    adminResetAll: () => request("/admin/reset/all-activity", { method: "POST", body: { confirmation: "RESET_ALL_ACTIVITY" } }),
   };
 
   window.loginAction = async function loginAction() {
@@ -578,6 +639,51 @@
       : `<div class="empty-panel">No achievements yet.</div>`;
     document.getElementById("upm-history").innerHTML = `<div class="title-card" style="background:${progression.titleGradient || "linear-gradient(135deg,#22c55e,#2563eb)"};"><div style="font-size:1.25rem;font-weight:900;">${progression.titleIcon || "\u{1F331}"} ${escapeHtml(user.title || progression.title || "Beginner")}</div><div>Real XP based rank</div></div>`;
     openModal("user-profile-modal");
+  };
+
+  window.loadAdminPanel = async function loadAdminPanel() {
+    if ((state.auth.user || getUser())?.role !== "admin") return;
+    try {
+      const [overview, pending, users] = await Promise.all([
+        BackendService.adminOverview(),
+        BackendService.adminPendingNgos(),
+        BackendService.adminUsers(),
+      ]);
+      const overviewEl = document.getElementById("admin-overview");
+      if (overviewEl) {
+        overviewEl.innerHTML = [
+          ["Users", overview.totalUsers],
+          ["Approved NGOs", overview.verifiedNGOs],
+          ["Pending NGOs", overview.pendingNGOs],
+          ["Verified Donations", overview.totalDonations],
+        ].map(([label, value]) => `<div class="card"><div class="label">${label}</div><div class="value">${compactNumber(value)}</div></div>`).join("");
+      }
+      const pendingEl = document.getElementById("admin-pending-ngos");
+      if (pendingEl) {
+        pendingEl.innerHTML = pending.length
+          ? pending.map((ngo) => `<div class="activity-item"><strong>${escapeHtml(ngo.name)}</strong><span>${escapeHtml(ngo.email)}</span></div>`).join("")
+          : `<div class="empty-panel">No pending NGO approvals.</div>`;
+      }
+      const usersEl = document.getElementById("admin-users");
+      if (usersEl) {
+        usersEl.innerHTML = users.length
+          ? users.map((user) => `
+            <div class="activity-item">
+              <div><strong>${escapeHtml(user.name)}</strong><span>${escapeHtml(user.email)} - ${compactNumber(user.xp)} XP</span></div>
+              <button class="btn btn-outline" onclick="resetUserActivity('${user._id}')">Reset</button>
+            </div>`).join("")
+          : `<div class="empty-panel">No users found.</div>`;
+      }
+    } catch (err) {
+      notify(`Admin panel unavailable: ${err.message}`);
+    }
+  };
+
+  window.resetUserActivity = async function resetUserActivity(id) {
+    if (!confirm("Reset this user's transactions, XP, badges, and totals?")) return;
+    await BackendService.adminResetUser(id);
+    notify("User activity reset.");
+    await loadAdminPanel();
   };
 
   document.addEventListener("DOMContentLoaded", async () => {

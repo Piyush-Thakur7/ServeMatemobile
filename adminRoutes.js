@@ -142,17 +142,6 @@ router.patch("/donations/:id/complete", adminOnly, async (req, res) => {
       return res.status(404).json({ error: "Donation not found" });
     }
 
-    await Transparency.create({
-      donation: donation._id,
-      ngo: donation.ngo?._id,
-      cause: donation.cause?._id,
-      description: proofNote || `${donation.cause?.title || "Donation"} completed`,
-      proofVideo,
-      location,
-      amount: donation.amount,
-      date: new Date(),
-    });
-
     if (donation.ngo) {
       await NGO.findByIdAndUpdate(donation.ngo._id, {
         $inc: { tasksCompleted: 1, impactScore: Math.floor(donation.amount / 10) },
@@ -168,20 +157,131 @@ router.patch("/donations/:id/complete", adminOnly, async (req, res) => {
 
 router.patch("/donations/:id/verify", adminOnly, async (req, res) => {
   try {
-    const donation = await Donation.findByIdAndUpdate(
-      req.params.id,
-      { status: "verified", verifiedAt: new Date() },
-      { new: true }
-    );
+    const donation = await Donation.findById(req.params.id).populate("cause ngo");
 
     if (!donation) {
       return res.status(404).json({ error: "Donation not found" });
     }
 
+    if (!donation.proofVideo) {
+      return res.status(400).json({ error: "A real proof video is required before public verification" });
+    }
+
+    if (!donation.ngo || !donation.ngo.verified) {
+      return res.status(400).json({ error: "Donation must be assigned to an approved NGO before verification" });
+    }
+
+    donation.status = "verified";
+    donation.verifiedAt = new Date();
+    await donation.save();
+
+    await Transparency.findOneAndUpdate(
+      { donation: donation._id },
+      {
+        donation: donation._id,
+        ngo: donation.ngo._id,
+        cause: donation.cause?._id,
+        description: donation.proofNote || `${donation.cause?.title || "Donation"} verified`,
+        proofVideo: donation.proofVideo,
+        location: donation.location || "",
+        amount: donation.amount,
+        date: new Date(),
+      },
+      { upsert: true, new: true }
+    );
+
     return res.json({ message: "Donation verified", donation });
   } catch (err) {
     console.error("[admin] Donation verification failed:", err.message);
     return res.status(500).json({ error: "Unable to verify donation" });
+  }
+});
+
+router.get("/users", adminOnly, async (req, res) => {
+  try {
+    const users = await User.find()
+      .select("name email role xp level title totalDonated donationCount badges createdAt")
+      .sort({ createdAt: -1 });
+    return res.json(users);
+  } catch (err) {
+    console.error("[admin] User list failed:", err.message);
+    return res.status(500).json({ error: "Unable to load users" });
+  }
+});
+
+router.post("/users/:id/reset-activity", adminOnly, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const donations = await Donation.find({ user: user._id }).select("_id cause ngo amount");
+    const donationIds = donations.map((donation) => donation._id);
+
+    await Transparency.deleteMany({ donation: { $in: donationIds } });
+    await Donation.deleteMany({ user: user._id });
+
+    for (const donation of donations) {
+      if (donation.cause) {
+        await Cause.findByIdAndUpdate(donation.cause, {
+          $inc: { raised: -Number(donation.amount || 0), contributors: -1 },
+        });
+      }
+      if (donation.ngo) {
+        await NGO.findByIdAndUpdate(donation.ngo, {
+          $inc: { totalReceived: -Number(donation.amount || 0) },
+        });
+      }
+    }
+
+    user.xp = 0;
+    user.level = 1;
+    user.title = "Beginner";
+    user.badges = [];
+    user.totalDonated = 0;
+    user.donationCount = 0;
+    user.lastDonation = undefined;
+    user.streak = 0;
+    await user.save();
+
+    return res.json({ message: "User donations, XP, badges, and totals reset", userId: user._id });
+  } catch (err) {
+    console.error("[admin] User activity reset failed:", err.message);
+    return res.status(500).json({ error: "Unable to reset user activity" });
+  }
+});
+
+router.post("/reset/all-activity", adminOnly, async (req, res) => {
+  try {
+    if (req.body.confirmation !== "RESET_ALL_ACTIVITY") {
+      return res.status(400).json({ error: "confirmation must be RESET_ALL_ACTIVITY" });
+    }
+
+    await Promise.all([
+      Donation.deleteMany({}),
+      Transparency.deleteMany({}),
+      Cause.updateMany({}, { $set: { raised: 0, contributors: 0 } }),
+      NGO.updateMany({}, { $set: { totalReceived: 0, impactScore: 0, tasksCompleted: 0 } }),
+      User.updateMany(
+        {},
+        {
+          $set: {
+            xp: 0,
+            level: 1,
+            title: "Beginner",
+            badges: [],
+            totalDonated: 0,
+            donationCount: 0,
+            streak: 0,
+          },
+          $unset: { lastDonation: "" },
+        }
+      ),
+    ]);
+
+    return res.json({ message: "All transactions, XP, badges, and public proof activity reset" });
+  } catch (err) {
+    console.error("[admin] Global reset failed:", err.message);
+    return res.status(500).json({ error: "Unable to reset platform activity" });
   }
 });
 

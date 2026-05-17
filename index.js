@@ -113,55 +113,8 @@ mongoose.connection.on("reconnected", () => {
 });
 
 async function seedDatabase() {
-  const { Cause, User } = require("./models");
+  const { User } = require("./models");
   const bcrypt = require("bcryptjs");
-
-  const causeCount = await Cause.countDocuments();
-  if (causeCount === 0) {
-    await Cause.insertMany([
-      {
-        title: "Meals for All",
-        description: "Provide nutritious meals to underprivileged children and elderly. Every ₹10 feeds one person.",
-        icon: "🍱",
-        category: "meals",
-        goal: 100000,
-        raised: 0,
-        contributors: 0,
-        impactPerRupee: "₹10 feeds 1 person for a day",
-      },
-      {
-        title: "Tree Plantation Drive",
-        description: "Plant trees across urban wastelands and barren hillsides. ₹50 plants and nurtures one tree for a full year.",
-        icon: "🌱",
-        category: "trees",
-        goal: 100000,
-        raised: 0,
-        contributors: 0,
-        impactPerRupee: "₹50 = 1 tree planted and maintained",
-      },
-      {
-        title: "Daily Essentials Kit",
-        description: "Distribute hygiene kits and essential supplies to families in flood-affected zones.",
-        icon: "🧴",
-        category: "essentials",
-        goal: 100000,
-        raised: 0,
-        contributors: 0,
-        impactPerRupee: "₹100 = 1 complete hygiene kit",
-      },
-      {
-        title: "NGO Community Support",
-        description: "Support verified NGOs with operational essentials, proof uploads, volunteer tools, and community response.",
-        icon: "🤝",
-        category: "ngo-support",
-        goal: 100000,
-        raised: 0,
-        contributors: 0,
-        impactPerRupee: "Verified NGO support",
-      },
-    ]);
-    console.log("[seed] Causes seeded");
-  }
 
   const adminExists = await User.findOne({ email: ADMIN_EMAIL });
   if (!adminExists) {
