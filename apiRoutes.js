@@ -3,7 +3,7 @@ const crypto = require("crypto");
 const Razorpay = require("razorpay");
 const { User, NGO, Cause, Donation, Transparency, Contact } = require("./models");
 const { authMiddleware } = require("./authRoutes");
-const { mergeCoreCauses } = require("./services/causeCatalog");
+const { CORE_CAUSES, mergeCoreCauses } = require("./services/causeCatalog");
 const { getProgression } = require("./services/gamificationService");
 
 const router = express.Router();
@@ -20,7 +20,55 @@ function razorpayClient() {
   return new Razorpay({ key_id: config.keyId, key_secret: config.keySecret });
 }
 
+function categoryKeywords(category) {
+  return {
+    meals: ["meal", "food", "hunger", "kitchen"],
+    trees: ["tree", "environment", "green", "plant"],
+    essentials: ["essential", "relief", "emergency", "hygiene"],
+    "ngo-support": ["ngo", "community", "support", "operation"],
+  }[category] || [category];
+}
+
+async function selectApprovedNgoForCategory(category) {
+  const ngos = await NGO.find({ verified: true }).sort({ impactScore: -1, tasksCompleted: -1, createdAt: 1 });
+  if (!ngos.length) return null;
+  const keywords = categoryKeywords(category);
+  return ngos.find((ngo) => {
+    const haystack = `${ngo.areaOfWork || ""} ${ngo.description || ""} ${ngo.about || ""}`.toLowerCase();
+    return keywords.some((keyword) => haystack.includes(keyword));
+  }) || ngos[0];
+}
+
+async function ensureCategoryCause(category) {
+  const core = CORE_CAUSES.find((item) => item.category === category);
+  if (!core) return null;
+
+  const verifiedNgoIds = await NGO.find({ verified: true }).distinct("_id");
+  if (!verifiedNgoIds.length) return null;
+
+  const existing = await Cause.findOne({ category, active: true, assignedNgo: { $in: verifiedNgoIds } })
+    .populate("assignedNgo", "verified name");
+  if (existing) return existing;
+
+  const ngo = await selectApprovedNgoForCategory(category);
+  if (!ngo) return null;
+
+  return Cause.create({
+    title: core.title,
+    description: core.description,
+    icon: core.icon,
+    category: core.category,
+    goal: 0,
+    impactPerRupee: core.impactPerRupee,
+    assignedNgo: ngo._id,
+    active: true,
+  }).then((cause) => cause.populate("assignedNgo", "verified name"));
+}
+
 async function getPayableCause(causeId) {
+  const coreCategory = CORE_CAUSES.find((item) => item.category === causeId);
+  if (coreCategory) return ensureCategoryCause(coreCategory.category);
+
   const cause = await Cause.findOne({ _id: causeId, active: true }).populate("assignedNgo", "verified name");
   if (!cause || !cause.active || !cause.assignedNgo || !cause.assignedNgo.verified) return null;
   return cause;
@@ -72,6 +120,9 @@ async function applyPaidDonation({ userId, cause, amount, paymentOrderId = "", p
 router.get("/causes", async (req, res) => {
   try {
     const verifiedNgoIds = await NGO.find({ verified: true }).distinct("_id");
+    if (verifiedNgoIds.length) {
+      await Promise.all(CORE_CAUSES.map((cause) => ensureCategoryCause(cause.category)));
+    }
     const causes = await Cause.find({ active: true, assignedNgo: { $in: verifiedNgoIds } })
       .populate("assignedNgo", "name verified rating")
       .sort({ raised: -1 });

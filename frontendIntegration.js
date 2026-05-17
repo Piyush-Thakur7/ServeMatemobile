@@ -275,7 +275,7 @@
     const goal = Number(cause.goal || 0);
     const contributors = Number(cause.contributors || 0);
     const hasActivity = Boolean(cause.hasRealActivity || raised > 0 || contributors > 0);
-    const canSupport = !cause.isPlaceholder && cause._id && cause.assignedNgo && cause.assignedNgo.verified;
+    const canSupport = cause._id && cause.assignedNgo && cause.assignedNgo.verified;
     const pct = hasActivity && goal > 0 ? Math.min(100, Math.round((raised / goal) * 100)) : 0;
 
     return `
@@ -294,7 +294,7 @@
           <div class="premium-progress"><span style="width:${pct}%"></span></div>
           <div class="cause-footer">
             <span style="font-size:.8rem;color:var(--text2);">${compactNumber(contributors)} supporters</span>
-            <button class="btn btn-primary" ${canSupport ? `onclick="openDonateModal('${cause._id}')"` : "disabled"}>${canSupport ? "Support" : "Awaiting approved NGO"}</button>
+            <button class="btn btn-primary" ${canSupport ? `onclick="openDonateModal('${cause._id}')"` : "disabled"}>${canSupport ? "Donate" : "Awaiting approved NGO"}</button>
           </div>
         ` : `
           <div class="cause-empty-state">
@@ -302,8 +302,8 @@
             <div style="font-size:.8rem;font-weight:600;margin-top:.25rem;">No community activity yet</div>
           </div>
           <div class="cause-footer">
-            <span style="font-size:.8rem;color:var(--text2);">${canSupport ? "Be the first supporter" : "Admin approval required"}</span>
-            <button class="btn btn-primary" ${canSupport ? `onclick="openDonateModal('${cause._id}')"` : "disabled"}>${canSupport ? "Support" : "Coming soon"}</button>
+            <span style="font-size:.8rem;color:var(--text2);">${canSupport ? `Routed to ${escapeHtml(cause.assignedNgo.name || "approved NGO")}` : "Needs one approved NGO"}</span>
+            <button class="btn btn-primary" ${canSupport ? `onclick="openDonateModal('${cause._id}')"` : "disabled"}>${canSupport ? "Donate" : "Coming soon"}</button>
           </div>
         `}
       </article>
@@ -311,7 +311,7 @@
   }
 
   function realDonationCauses() {
-    return (state.causes || []).filter((cause) => !cause.isPlaceholder && cause._id && cause.assignedNgo && cause.assignedNgo.verified);
+    return (state.causes || []).filter((cause) => cause._id && cause.assignedNgo && cause.assignedNgo.verified);
   }
 
   function populateDonationCauses(selectedId = "") {
@@ -319,12 +319,12 @@
     if (!select) return;
     const causes = realDonationCauses();
     if (!causes.length) {
-      select.innerHTML = `<option value="">No approved NGO causes available yet</option>`;
+      select.innerHTML = `<option value="">No approved NGO available yet</option>`;
       select.disabled = true;
       return;
     }
     select.disabled = false;
-    select.innerHTML = causes.map((cause) => `<option value="${escapeHtml(cause._id)}">${escapeHtml(cause.title)}${cause.assignedNgo?.name ? ` - ${escapeHtml(cause.assignedNgo.name)}` : ""}</option>`).join("");
+    select.innerHTML = causes.map((cause) => `<option value="${escapeHtml(cause._id)}">${escapeHtml(cause.title)}${cause.assignedNgo?.name ? ` - routed to ${escapeHtml(cause.assignedNgo.name)}` : ""}</option>`).join("");
     if (selectedId && causes.some((cause) => String(cause._id) === String(selectedId))) select.value = selectedId;
   }
 
