@@ -500,7 +500,7 @@
   }
 
   function ensureAdminNavigation() {
-    const user = state.auth.user || getUser();
+    const user = state.auth.user || readUser();
     const adminPage = document.getElementById("page-admin");
     const nav = document.querySelector(".nav-links");
     const mobile = document.getElementById("mobile-menu");
@@ -541,7 +541,11 @@
     volunteer: (ngoId, payload = {}) => request(`/ngos/${ngoId}/volunteers`, { method: "POST", body: payload }),
     adminOverview: () => request("/admin/overview"),
     adminPendingNgos: () => request("/admin/ngos/pending"),
+    adminAllNgos: () => request("/admin/ngos/all"),
+    adminVerifyNgo: (id) => request(`/admin/ngos/${id}/verify`, { method: "PATCH" }),
+    adminRemoveNgo: (id) => request(`/admin/ngos/${id}`, { method: "DELETE" }),
     adminUsers: () => request("/admin/users"),
+    adminDonations: () => request("/admin/donations"),
     adminResetUser: (id) => request(`/admin/users/${id}/reset-activity`, { method: "POST", body: {} }),
     adminResetAll: () => request("/admin/reset/all-activity", { method: "POST", body: { confirmation: "RESET_ALL_ACTIVITY" } }),
   };
@@ -642,12 +646,17 @@
   };
 
   window.loadAdminPanel = async function loadAdminPanel() {
-    if ((state.auth.user || getUser())?.role !== "admin") return;
+    if ((state.auth.user || readUser())?.role !== "admin") {
+      notify("Admin login required.");
+      return;
+    }
     try {
-      const [overview, pending, users] = await Promise.all([
+      const [overview, pending, allNgos, users, donationData] = await Promise.all([
         BackendService.adminOverview(),
         BackendService.adminPendingNgos(),
+        BackendService.adminAllNgos(),
         BackendService.adminUsers(),
+        BackendService.adminDonations(),
       ]);
       const overviewEl = document.getElementById("admin-overview");
       if (overviewEl) {
@@ -656,13 +665,40 @@
           ["Approved NGOs", overview.verifiedNGOs],
           ["Pending NGOs", overview.pendingNGOs],
           ["Verified Donations", overview.totalDonations],
+          ["Real Donations", donationData.total || 0],
         ].map(([label, value]) => `<div class="card"><div class="label">${label}</div><div class="value">${compactNumber(value)}</div></div>`).join("");
       }
       const pendingEl = document.getElementById("admin-pending-ngos");
       if (pendingEl) {
         pendingEl.innerHTML = pending.length
-          ? pending.map((ngo) => `<div class="activity-item"><strong>${escapeHtml(ngo.name)}</strong><span>${escapeHtml(ngo.email)}</span></div>`).join("")
+          ? pending.map((ngo) => `
+            <div class="activity-item">
+              <div>
+                <strong>${escapeHtml(ngo.name)}</strong>
+                <span>${escapeHtml(ngo.email)} - ${escapeHtml(ngo.areaOfWork || "NGO")}</span>
+              </div>
+              <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+                <button class="btn btn-primary" onclick="approveNgo('${ngo._id}')">Approve</button>
+                <button class="btn btn-outline" onclick="removeNgo('${ngo._id}')">Remove</button>
+              </div>
+            </div>`).join("")
           : `<div class="empty-panel">No pending NGO approvals.</div>`;
+      }
+      const allNgosEl = document.getElementById("admin-all-ngos");
+      if (allNgosEl) {
+        allNgosEl.innerHTML = allNgos.length
+          ? allNgos.map((ngo) => `
+            <div class="activity-item">
+              <div>
+                <strong>${escapeHtml(ngo.name)}</strong>
+                <span>${ngo.verified ? "Approved" : "Pending"} - ${escapeHtml(ngo.email)}</span>
+              </div>
+              <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+                ${ngo.verified ? "" : `<button class="btn btn-primary" onclick="approveNgo('${ngo._id}')">Approve</button>`}
+                <button class="btn btn-outline" onclick="removeNgo('${ngo._id}')">Remove</button>
+              </div>
+            </div>`).join("")
+          : `<div class="empty-panel">No NGO registrations found.</div>`;
       }
       const usersEl = document.getElementById("admin-users");
       if (usersEl) {
@@ -674,9 +710,37 @@
             </div>`).join("")
           : `<div class="empty-panel">No users found.</div>`;
       }
+      const donationsEl = document.getElementById("admin-donations");
+      if (donationsEl) {
+        const donations = donationData.donations || [];
+        donationsEl.innerHTML = donations.length
+          ? donations.map((donation) => `
+            <div class="activity-item">
+              <div>
+                <strong>${escapeHtml(donation.user?.name || "User")} - ${compactNumber(donation.amount, { money: true })}</strong>
+                <span>${escapeHtml(donation.cause?.title || "Cause")} - ${escapeHtml(donation.status)}</span>
+              </div>
+            </div>`).join("")
+          : `<div class="empty-panel">No real donations found.</div>`;
+      }
     } catch (err) {
       notify(`Admin panel unavailable: ${err.message}`);
     }
+  };
+
+  window.approveNgo = async function approveNgo(id) {
+    await BackendService.adminVerifyNgo(id);
+    notify("NGO approved.");
+    await loadAdminPanel();
+    await Promise.all([loadCauses(), loadLeaderboard("ngos"), loadStats()]);
+  };
+
+  window.removeNgo = async function removeNgo(id) {
+    if (!confirm("Remove this NGO registration from MongoDB?")) return;
+    await BackendService.adminRemoveNgo(id);
+    notify("NGO removed.");
+    await loadAdminPanel();
+    await Promise.all([loadCauses(), loadLeaderboard("ngos"), loadStats()]);
   };
 
   window.resetUserActivity = async function resetUserActivity(id) {
@@ -684,6 +748,7 @@
     await BackendService.adminResetUser(id);
     notify("User activity reset.");
     await loadAdminPanel();
+    await Promise.all([loadDashboard(), loadLeaderboard("donors"), loadStats(), loadCauses()]);
   };
 
   document.addEventListener("DOMContentLoaded", async () => {
