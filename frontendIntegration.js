@@ -174,6 +174,14 @@
       .lb-row::after { content:""; position:absolute; inset:0; background:linear-gradient(90deg, transparent, rgba(255,255,255,.08), transparent); transform:translateX(-120%); transition:transform .6s ease; pointer-events:none; }
       .lb-row:hover::after { transform:translateX(120%); }
       .empty-panel { padding: 1.5rem; border-radius: 18px; border: 1px dashed var(--border); background: color-mix(in srgb, var(--card) 78%, var(--bg2)); text-align: center; color: var(--text2); }
+      .empty-panel strong { display:block; color:var(--text); margin-bottom:.35rem; }
+      .empty-panel span { display:block; line-height:1.55; }
+      .real-proof-card, .real-ngo-card {
+        border:1px solid var(--border); border-radius:20px; padding:1rem; background:var(--card);
+        box-shadow:0 18px 60px rgba(15,23,42,.08); transition:transform .22s ease, box-shadow .22s ease;
+      }
+      .real-proof-card:hover, .real-ngo-card:hover { transform:translateY(-4px); box-shadow:0 26px 80px rgba(15,23,42,.14); }
+      .real-proof-meta, .real-ngo-meta { color:var(--text2); font-size:.86rem; line-height:1.6; }
       .title-card { padding:1rem; border-radius:20px; color:#fff; position:relative; overflow:hidden; box-shadow:0 22px 70px rgba(79,70,229,.24); }
       .title-card::before { content:""; position:absolute; inset:-2px; background:linear-gradient(120deg, rgba(255,255,255,.42), transparent 34%, rgba(255,255,255,.24)); animation: sm-sheen 3s linear infinite; }
       .title-card > * { position:relative; }
@@ -188,6 +196,8 @@
     renderCauses(document.getElementById("causes-grid"), []);
     renderLeaderboard("donors", []);
     renderLeaderboard("ngos", []);
+    renderTransparency([]);
+    renderNGOs([]);
     renderLoggedOutDashboard();
     document.querySelectorAll(".hero-stat .num").forEach((node) => (node.textContent = "0"));
   }
@@ -484,6 +494,77 @@
     }).join("");
   }
 
+  async function loadTransparency() {
+    try {
+      const payload = await request("/transparency");
+      renderTransparency(Array.isArray(payload) ? payload : payload.logs || []);
+    } catch (_) {
+      renderTransparency([]);
+    }
+  }
+
+  function renderTransparency(logs) {
+    const feed = document.getElementById("transparency-feed");
+    if (!feed) return;
+    if (!Array.isArray(logs) || logs.length === 0) {
+      feed.innerHTML = `<div class="empty-panel"><strong>No verified proof videos yet</strong><span>Real NGO proof will appear here after an approved NGO completes work and an admin verifies the uploaded video.</span></div>`;
+      return;
+    }
+    feed.innerHTML = logs.map((log) => {
+      const date = log.createdAt ? new Date(log.createdAt).toLocaleDateString("en-IN") : "Verified";
+      const title = log.title || log.cause?.title || "Verified impact proof";
+      const ngoName = log.ngo?.name || "Verified NGO";
+      const location = log.location || log.ngo?.location || "Verified location";
+      const description = log.description || "Admin-verified proof uploaded by the NGO.";
+      const proof = log.proofVideo ? `<a class="proof-btn" href="${escapeHtml(log.proofVideo)}" target="_blank" rel="noopener">Watch proof</a>` : `<span style="color:var(--text3);">Proof processing</span>`;
+      return `<article class="real-proof-card">
+        <div style="display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;flex-wrap:wrap;">
+          <div>
+            <h4 style="margin:0 0 .4rem;font-size:1rem;font-weight:850;">${escapeHtml(title)}</h4>
+            <div class="real-proof-meta">${escapeHtml(date)} | ${escapeHtml(location)} | ${escapeHtml(ngoName)}</div>
+          </div>
+          ${proof}
+        </div>
+        <p style="margin:.85rem 0 0;color:var(--text2);line-height:1.65;">${escapeHtml(description)}</p>
+      </article>`;
+    }).join("");
+  }
+
+  async function loadNGOs() {
+    try {
+      const ngos = await request("/ngos");
+      renderNGOs(Array.isArray(ngos) ? ngos : []);
+    } catch (_) {
+      renderNGOs([]);
+    }
+  }
+
+  function renderNGOs(ngos) {
+    const grid = document.getElementById("ngo-grid");
+    if (!grid) return;
+    if (!Array.isArray(ngos) || ngos.length === 0) {
+      grid.innerHTML = `<div class="empty-panel" style="grid-column:1/-1;"><strong>No approved NGOs yet</strong><span>Approved NGO registrations from MongoDB will appear here after admin verification.</span></div>`;
+      return;
+    }
+    grid.innerHTML = ngos.map((ngo) => {
+      const areas = Array.isArray(ngo.causesManaged) && ngo.causesManaged.length
+        ? ngo.causesManaged.join(", ")
+        : (ngo.areaOfWork || "Verified community work");
+      return `<article class="real-ngo-card">
+        <div style="display:flex;align-items:center;gap:.85rem;margin-bottom:.85rem;">
+          <div class="lb-avatar">${ngo.logo ? "" : initials(ngo.name)}</div>
+          <div>
+            <div style="font-weight:900;">${escapeHtml(ngo.name || "Verified NGO")} <span class="verified-tick">✓</span></div>
+            <div class="real-ngo-meta">${escapeHtml(ngo.location || "Location pending")}</div>
+          </div>
+        </div>
+        <p style="color:var(--text2);line-height:1.65;margin:.5rem 0 1rem;">${escapeHtml(ngo.about || areas)}</p>
+        <div class="real-ngo-meta">Impact score: ${compactNumber(ngo.impactScore)} | Completed tasks: ${compactNumber(ngo.tasksCompleted)} | Volunteers: ${compactNumber(ngo.volunteerCount || 0)}</div>
+        <button class="btn btn-outline btn-full" style="margin-top:1rem;" onclick="openNGOProfile('${escapeHtml(ngo._id || "")}')">View NGO</button>
+      </article>`;
+    }).join("");
+  }
+
   function renderAuthShell() {
     const user = state.auth.user;
     Array.from(document.querySelectorAll("button")).filter((button) => /login/i.test(button.textContent)).forEach((button) => {
@@ -539,6 +620,8 @@
     registerNGO: (payload) => request("/auth/ngo/register", { method: "POST", body: payload }),
     updateProfile: (payload) => request("/profile", { method: "PATCH", body: payload }),
     volunteer: (ngoId, payload = {}) => request(`/ngos/${ngoId}/volunteers`, { method: "POST", body: payload }),
+    transparency: () => request("/transparency"),
+    ngos: () => request("/ngos"),
     adminOverview: () => request("/admin/overview"),
     adminPendingNgos: () => request("/admin/ngos/pending"),
     adminAllNgos: () => request("/admin/ngos/all"),
@@ -756,6 +839,6 @@
     window.ServeMateState = state;
     clearDemoShell();
     renderAuthShell();
-    await Promise.all([loadStats(), loadCauses(), loadDashboard(), loadLeaderboard("donors")]);
+    await Promise.all([loadStats(), loadCauses(), loadDashboard(), loadLeaderboard("donors"), loadLeaderboard("ngos"), loadTransparency(), loadNGOs()]);
   });
 })();
