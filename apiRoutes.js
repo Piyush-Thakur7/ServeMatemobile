@@ -1,10 +1,68 @@
 ﻿const express  = require("express");
+const crypto = require("crypto");
+const Razorpay = require("razorpay");
 const { User, NGO, Cause, Donation, Transparency, Contact } = require("./models");
 const { authMiddleware } = require("./authRoutes");
 const { mergeCoreCauses } = require("./services/causeCatalog");
 const { getProgression } = require("./services/gamificationService");
 
 const router = express.Router();
+
+function razorpayConfig() {
+  const keyId = process.env.RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY;
+  const keySecret = process.env.RAZORPAY_KEY_SECRET || process.env.RAZORPAY_SECRET;
+  return { keyId, keySecret, enabled: Boolean(keyId && keySecret) };
+}
+
+function razorpayClient() {
+  const config = razorpayConfig();
+  if (!config.enabled) return null;
+  return new Razorpay({ key_id: config.keyId, key_secret: config.keySecret });
+}
+
+async function getPayableCause(causeId) {
+  const cause = await Cause.findOne({ _id: causeId, active: true }).populate("assignedNgo", "verified name");
+  if (!cause || !cause.active || !cause.assignedNgo || !cause.assignedNgo.verified) return null;
+  return cause;
+}
+
+async function applyPaidDonation({ userId, cause, amount, paymentOrderId = "", paymentId = "", paymentSignature = "" }) {
+  if (paymentId) {
+    const existing = await Donation.findOne({ paymentId });
+    if (existing) return existing;
+  }
+
+  const donation = await Donation.create({
+    user: userId,
+    cause: cause._id,
+    ngo: cause.assignedNgo,
+    amount,
+    xpEarned: amount,
+    status: "completed",
+    paymentProvider: paymentId ? "razorpay" : "",
+    paymentOrderId,
+    paymentId,
+    paymentSignature,
+    location: cause.location || "",
+  });
+
+  await Cause.findByIdAndUpdate(cause._id, { $inc: { raised: amount, contributors: 1 } });
+
+  const user = await User.findById(userId);
+  if (!user) throw new Error("User not found");
+  user.totalDonated += amount;
+  user.donationCount += 1;
+  user.xp += amount;
+  user.lastDonation = new Date();
+  if (user.donationCount === 1 && !user.badges.includes("First Donation")) user.badges.push("First Donation");
+  if (user.donationCount >= 10 && !user.badges.includes("Consistent Giver")) user.badges.push("Consistent Giver");
+  if (user.donationCount >= 100 && !user.badges.includes("Century Club")) user.badges.push("Century Club");
+  if (user.xp >= 5000 && !user.badges.includes("Impact Creator")) user.badges.push("Impact Creator");
+  await user.save();
+
+  await NGO.findByIdAndUpdate(cause.assignedNgo, { $inc: { totalReceived: amount } });
+  return donation;
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 //  CAUSES
@@ -39,73 +97,98 @@ router.get("/causes/:id", async (req, res) => {
 //  DONATIONS
 // ════════════════════════════════════════════════════════════════════════════
 
-// POST /api/donate - authenticated user donates to a cause
-router.post("/donate", authMiddleware, async (req, res) => {
+router.get("/payments/config", (req, res) => {
+  const config = razorpayConfig();
+  res.json({ enabled: config.enabled, keyId: config.keyId || "" });
+});
+
+router.post("/payments/order", authMiddleware, async (req, res) => {
   try {
     const { causeId, amount } = req.body;
     const safeAmount = Math.floor(Number(amount));
-    if (!causeId || !Number.isFinite(safeAmount) || safeAmount < 10)
+    if (!causeId || !Number.isFinite(safeAmount) || safeAmount < 10) {
       return res.status(400).json({ error: "Cause and minimum amount of Rs 10 required" });
-    const cause = await Cause.findOne({ _id: causeId, active: true }).populate("assignedNgo", "verified");
-    if (!cause || !cause.active || !cause.assignedNgo || !cause.assignedNgo.verified)
-      return res.status(404).json({ error: "This cause is not available until an approved NGO is assigned" });
-
-    // XP earned = 1 XP per Rs 1 donated (min 10)
-    const xpEarned = safeAmount;
-
-    // Create donation record
-    const donation = await Donation.create({
-      user:   req.user.id,
-      cause:  cause._id,
-      ngo:    cause.assignedNgo,
-      amount: safeAmount,
-      xpEarned,
-      status: "pending",
-      location: cause.location || ""
-    });
-
-    // Update cause stats
-    await Cause.findByIdAndUpdate(cause._id, {
-      $inc: { raised: safeAmount, contributors: 1 }
-    });
-
-    // Update user stats + XP + badges
-    const user = await User.findById(req.user.id);
-    if (!user)
-      return res.status(404).json({ error: "User not found" });
-    user.totalDonated  += safeAmount;
-    user.donationCount += 1;
-    user.xp            += xpEarned;
-    user.lastDonation   = new Date();
-
-    // Award badges
-    if (user.donationCount === 1 && !user.badges.includes("First Donation"))
-      user.badges.push("First Donation");
-    if (user.donationCount >= 10 && !user.badges.includes("Consistent Giver"))
-      user.badges.push("Consistent Giver");
-    if (user.donationCount >= 100 && !user.badges.includes("Century Club"))
-      user.badges.push("Century Club");
-    if (user.xp >= 5000 && !user.badges.includes("Impact Creator"))
-      user.badges.push("Impact Creator");
-
-    await user.save();
-    const progression = getProgression(user.xp);
-
-    // If NGO assigned, update received amount
-    if (cause.assignedNgo) {
-      await NGO.findByIdAndUpdate(cause.assignedNgo, {
-        $inc: { totalReceived: safeAmount }
-      });
     }
 
-    res.status(201).json({
-      message: "Donation successful!",
-      donation: {
-        id: donation._id,
-        amount: donation.amount,
-        status: donation.status,
-        xpEarned,
+    const cause = await getPayableCause(causeId);
+    if (!cause) {
+      return res.status(404).json({ error: "This cause is not available until an approved NGO is assigned" });
+    }
+
+    const client = razorpayClient();
+    const config = razorpayConfig();
+    if (!client) {
+      return res.status(503).json({ error: "Razorpay is not configured on the server" });
+    }
+
+    const order = await client.orders.create({
+      amount: safeAmount * 100,
+      currency: "INR",
+      receipt: `servemate_${Date.now()}`,
+      notes: {
+        causeId: String(cause._id),
+        userId: String(req.user.id),
+        ngoId: String(cause.assignedNgo._id),
       },
+    });
+
+    return res.json({
+      keyId: config.keyId,
+      orderId: order.id,
+      amount: safeAmount,
+      currency: "INR",
+      cause: { id: cause._id, title: cause.title, ngo: cause.assignedNgo.name },
+    });
+  } catch (err) {
+    console.error("[payments] Order creation failed:", err.message);
+    res.status(500).json({ error: "Unable to create payment order" });
+  }
+});
+
+router.post("/payments/verify", authMiddleware, async (req, res) => {
+  try {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, causeId, amount } = req.body;
+    const safeAmount = Math.floor(Number(amount));
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !causeId || !Number.isFinite(safeAmount)) {
+      return res.status(400).json({ error: "Payment verification details are incomplete" });
+    }
+
+    const client = razorpayClient();
+    const { keySecret } = razorpayConfig();
+    if (!client || !keySecret) return res.status(503).json({ error: "Razorpay is not configured on the server" });
+
+    const expected = crypto.createHmac("sha256", keySecret).update(`${razorpay_order_id}|${razorpay_payment_id}`).digest("hex");
+    if (expected !== razorpay_signature) {
+      return res.status(400).json({ error: "Payment signature verification failed" });
+    }
+
+    const payment = await client.payments.fetch(razorpay_payment_id);
+    if (payment.order_id !== razorpay_order_id || Number(payment.amount) !== safeAmount * 100) {
+      return res.status(400).json({ error: "Payment amount or order mismatch" });
+    }
+    if (!["authorized", "captured"].includes(payment.status)) {
+      return res.status(400).json({ error: "Payment is not successful yet" });
+    }
+
+    const cause = await getPayableCause(causeId);
+    if (!cause) {
+      return res.status(404).json({ error: "This cause is not available until an approved NGO is assigned" });
+    }
+
+    const donation = await applyPaidDonation({
+      userId: req.user.id,
+      cause,
+      amount: safeAmount,
+      paymentOrderId: razorpay_order_id,
+      paymentId: razorpay_payment_id,
+      paymentSignature: razorpay_signature,
+    });
+
+    const user = await User.findById(req.user.id);
+    const progression = getProgression(user.xp);
+    return res.status(201).json({
+      message: "Payment verified and donation recorded",
+      donation: { id: donation._id, amount: donation.amount, status: donation.status, xpEarned: donation.xpEarned },
       user: {
         xp: user.xp,
         level: user.level,
@@ -113,12 +196,18 @@ router.post("/donate", authMiddleware, async (req, res) => {
         progression,
         badges: user.badges,
         totalDonated: user.totalDonated,
-        donationCount: user.donationCount
-      }
+        donationCount: user.donationCount,
+      },
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("[payments] Verification failed:", err.message);
+    res.status(500).json({ error: "Unable to verify payment" });
   }
+});
+
+// POST /api/donate - disabled so donations cannot bypass verified payment
+router.post("/donate", authMiddleware, async (req, res) => {
+  return res.status(410).json({ error: "Use Razorpay checkout. Direct donation recording is disabled." });
 });
 
 // GET /api/donations/history  — user's own donation history

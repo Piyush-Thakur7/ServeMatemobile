@@ -10,6 +10,8 @@
   const state = {
     auth: { token: localStorage.getItem(tokenKey), user: readUser() },
     causes: [],
+    ngos: [],
+    admin: { causes: [] },
     leaderboard: { donors: [], ngos: [] },
     dashboard: null,
     payment: { lastDonation: null },
@@ -182,12 +184,31 @@
       }
       .real-proof-card:hover, .real-ngo-card:hover { transform:translateY(-4px); box-shadow:0 26px 80px rgba(15,23,42,.14); }
       .real-proof-meta, .real-ngo-meta { color:var(--text2); font-size:.86rem; line-height:1.6; }
+      .admin-shell { display:grid; grid-template-columns: 260px minmax(0,1fr); gap:1.2rem; align-items:start; }
+      .admin-sidebar { position:sticky; top:86px; border:1px solid var(--border); border-radius:22px; padding:1rem; background:linear-gradient(180deg,var(--card),color-mix(in srgb,var(--bg2) 70%,var(--card))); box-shadow:0 22px 70px rgba(15,23,42,.08); }
+      .admin-action { width:100%; display:flex; align-items:center; justify-content:space-between; gap:.75rem; border:1px solid var(--border); background:var(--card); color:var(--text); padding:.75rem .85rem; border-radius:14px; font-weight:800; cursor:pointer; margin-bottom:.55rem; }
+      .admin-action:hover { border-color:var(--blue); transform:translateY(-1px); }
+      .admin-panel-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:1rem; }
+      .admin-stat-card { border:1px solid var(--border); border-radius:20px; padding:1rem; background:var(--card); box-shadow:0 16px 45px rgba(15,23,42,.07); }
+      .admin-stat-card .label { color:var(--text2); font-size:.78rem; text-transform:uppercase; letter-spacing:.06em; font-weight:850; }
+      .admin-stat-card .value { font-size:1.55rem; font-weight:950; margin-top:.35rem; }
+      .admin-section { border:1px solid var(--border); border-radius:22px; background:var(--card); box-shadow:0 20px 65px rgba(15,23,42,.08); padding:1rem; margin-top:1rem; }
+      .admin-section-head { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; margin-bottom:1rem; flex-wrap:wrap; }
+      .admin-section h4 { font-size:1rem; font-weight:900; margin:0 0 .2rem; }
+      .admin-muted { color:var(--text2); font-size:.84rem; line-height:1.55; }
+      .admin-list { display:flex; flex-direction:column; gap:.7rem; }
+      .admin-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:1rem; align-items:center; border:1px solid var(--border); background:color-mix(in srgb,var(--bg2) 60%,var(--card)); border-radius:16px; padding:.85rem; }
+      .admin-row-title { font-weight:900; margin-bottom:.2rem; }
+      .admin-row-meta { color:var(--text2); font-size:.82rem; line-height:1.5; }
+      .admin-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.75rem; }
+      .admin-form .full { grid-column:1/-1; }
       .title-card { padding:1rem; border-radius:20px; color:#fff; position:relative; overflow:hidden; box-shadow:0 22px 70px rgba(79,70,229,.24); }
       .title-card::before { content:""; position:absolute; inset:-2px; background:linear-gradient(120deg, rgba(255,255,255,.42), transparent 34%, rgba(255,255,255,.24)); animation: sm-sheen 3s linear infinite; }
       .title-card > * { position:relative; }
       .sm-skeleton { opacity:.75; }
       @keyframes sm-sheen { from { transform: translateX(-80%); } to { transform: translateX(80%); } }
-      @media (max-width: 720px) { .premium-cause-card { min-height: auto; } .cause-visual { height: 112px; } .lb-row { align-items:flex-start; } }
+      @media (max-width: 900px) { .admin-shell { grid-template-columns:1fr; } .admin-sidebar { position:static; } }
+      @media (max-width: 720px) { .premium-cause-card { min-height: auto; } .cause-visual { height: 112px; } .lb-row { align-items:flex-start; } .admin-row { grid-template-columns:1fr; } .admin-form { grid-template-columns:1fr; } }
     `;
     document.head.appendChild(style);
   }
@@ -533,8 +554,10 @@
   async function loadNGOs() {
     try {
       const ngos = await request("/ngos");
-      renderNGOs(Array.isArray(ngos) ? ngos : []);
+      state.ngos = Array.isArray(ngos) ? ngos : [];
+      renderNGOs(state.ngos);
     } catch (_) {
+      state.ngos = [];
       renderNGOs([]);
     }
   }
@@ -564,6 +587,29 @@
       </article>`;
     }).join("");
   }
+
+  window.openNGOProfile = function openNGOProfile(id) {
+    const ngo = (state.ngos || []).find((row) => String(row._id || row.id) === String(id));
+    if (!ngo) {
+      notify("NGO profile is available after real NGO data loads.");
+      return;
+    }
+    document.getElementById("npm-icon").textContent = initials(ngo.name);
+    document.getElementById("npm-name").textContent = `${ngo.name || "Verified NGO"} ✓`;
+    document.getElementById("npm-location").textContent = ngo.location || "Location pending";
+    document.getElementById("npm-rating").innerHTML = `<span style="color:var(--orange);font-size:.85rem;">${Number(ngo.rating || 0).toFixed(1)} rating</span>`;
+    document.getElementById("npm-stats").innerHTML = [
+      { n: compactNumber(ngo.tasksCompleted), l: "Tasks" },
+      { n: compactNumber(ngo.volunteerCount || 0), l: "Volunteers" },
+      { n: compactNumber(ngo.impactScore), l: "Impact" },
+    ].map((s) => `<div class="pm-stat"><div class="n">${escapeHtml(s.n)}</div><div class="l">${escapeHtml(s.l)}</div></div>`).join("");
+    document.getElementById("npm-motive").textContent = ngo.about || ngo.description || ngo.areaOfWork || "Approved NGO profile from MongoDB.";
+    document.getElementById("npm-badges").innerHTML = `<span class="badge badge-green">Verified NGO</span>${ngo.areaOfWork ? `<span class="badge badge-blue">${escapeHtml(ngo.areaOfWork)}</span>` : ""}`;
+    document.getElementById("npm-vol-count").textContent = compactNumber(ngo.volunteerCount || 0);
+    document.getElementById("npm-volunteers").innerHTML = `<div class="empty-panel">Volunteer details appear after real approved requests.</div>`;
+    document.getElementById("npm-videos").innerHTML = `<div class="empty-panel">Verified proof videos appear from public transparency records.</div>`;
+    openModal("ngo-profile-modal");
+  };
 
   function renderAuthShell() {
     const user = state.auth.user;
@@ -617,6 +663,9 @@
     login: (email, password) => request("/auth/login", { method: "POST", body: { email, password } }).then((data) => (setSession(data), data)),
     register: (name, email, password) => request("/auth/register", { method: "POST", body: { name, email, password } }).then((data) => (setSession(data), data)),
     donate: (amount, causeId) => request("/donate", { method: "POST", body: { amount, causeId } }),
+    paymentConfig: () => request("/payments/config"),
+    createPaymentOrder: (amount, causeId) => request("/payments/order", { method: "POST", body: { amount, causeId } }),
+    verifyPayment: (payload) => request("/payments/verify", { method: "POST", body: payload }),
     registerNGO: (payload) => request("/auth/ngo/register", { method: "POST", body: payload }),
     updateProfile: (payload) => request("/profile", { method: "PATCH", body: payload }),
     volunteer: (ngoId, payload = {}) => request(`/ngos/${ngoId}/volunteers`, { method: "POST", body: payload }),
@@ -625,6 +674,8 @@
     adminOverview: () => request("/admin/overview"),
     adminPendingNgos: () => request("/admin/ngos/pending"),
     adminAllNgos: () => request("/admin/ngos/all"),
+    adminCauses: () => request("/admin/causes"),
+    adminCreateCause: (payload) => request("/admin/causes", { method: "POST", body: payload }),
     adminVerifyNgo: (id) => request(`/admin/ngos/${id}/verify`, { method: "PATCH" }),
     adminRemoveNgo: (id) => request(`/admin/ngos/${id}`, { method: "DELETE" }),
     adminUsers: () => request("/admin/users"),
@@ -651,6 +702,17 @@
       notify(`Authentication failed: ${err.message}`);
     }
   };
+
+  function loadRazorpayScript() {
+    return new Promise((resolve, reject) => {
+      if (window.Razorpay) return resolve();
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = resolve;
+      script.onerror = () => reject(new Error("Unable to load Razorpay checkout"));
+      document.head.appendChild(script);
+    });
+  }
 
   window.showDonateSuccess = async function showDonateSuccess() {
     if (!getToken()) {
@@ -679,7 +741,28 @@
         button.disabled = true;
         button.textContent = "Processing payment...";
       }
-      const result = await BackendService.donate(amount, cause);
+      const order = await BackendService.createPaymentOrder(amount, cause);
+      await loadRazorpayScript();
+      const result = await new Promise((resolve, reject) => {
+        const checkout = new window.Razorpay({
+          key: order.keyId,
+          amount: order.amount * 100,
+          currency: order.currency || "INR",
+          name: "ServeMATE",
+          description: order.cause?.title || "Verified cause donation",
+          order_id: order.orderId,
+          handler: async (response) => {
+            try {
+              resolve(await BackendService.verifyPayment({ ...response, causeId: cause, amount }));
+            } catch (err) {
+              reject(err);
+            }
+          },
+          modal: { ondismiss: () => reject(new Error("Payment cancelled")) },
+          theme: { color: "#2563eb" },
+        });
+        checkout.open();
+      });
       state.payment.lastDonation = result.donation;
       document.getElementById("success-amount").textContent = money(result.donation?.amount || amount);
       const successCause = document.querySelector("#donate-step2 strong:last-of-type");
@@ -690,7 +773,9 @@
       document.getElementById("donate-step2").style.display = "";
       await Promise.all([loadDashboard(), loadCauses(), loadLeaderboard("donors")]);
     } catch (err) {
-      notify(`Donation failed: ${err.message}`);
+      notify(err.message.includes("Razorpay is not configured")
+        ? "Payment gateway is not configured yet. Add Razorpay keys on the server before accepting donations."
+        : `Donation failed: ${err.message}`);
     } finally {
       if (button) {
         button.disabled = false;
@@ -734,13 +819,22 @@
       return;
     }
     try {
-      const [overview, pending, allNgos, users, donationData] = await Promise.all([
+      const [overview, pending, allNgos, users, donationData, causes] = await Promise.all([
         BackendService.adminOverview(),
         BackendService.adminPendingNgos(),
         BackendService.adminAllNgos(),
         BackendService.adminUsers(),
         BackendService.adminDonations(),
+        BackendService.adminCauses(),
       ]);
+      state.admin.causes = causes || [];
+      const causeNgoSelect = document.getElementById("admin-cause-ngo");
+      if (causeNgoSelect) {
+        const approved = (allNgos || []).filter((ngo) => ngo.verified);
+        causeNgoSelect.innerHTML = approved.length
+          ? approved.map((ngo) => `<option value="${escapeHtml(ngo._id)}">${escapeHtml(ngo.name)} - ${escapeHtml(ngo.location || "Approved")}</option>`).join("")
+          : `<option value="">No approved NGOs available</option>`;
+      }
       const overviewEl = document.getElementById("admin-overview");
       if (overviewEl) {
         overviewEl.innerHTML = [
@@ -749,16 +843,29 @@
           ["Pending NGOs", overview.pendingNGOs],
           ["Verified Donations", overview.totalDonations],
           ["Real Donations", donationData.total || 0],
-        ].map(([label, value]) => `<div class="card"><div class="label">${label}</div><div class="value">${compactNumber(value)}</div></div>`).join("");
+          ["Live Causes", causes.length || 0],
+        ].map(([label, value]) => `<div class="admin-stat-card"><div class="label">${label}</div><div class="value">${compactNumber(value)}</div></div>`).join("");
+      }
+      const causesEl = document.getElementById("admin-causes");
+      if (causesEl) {
+        causesEl.innerHTML = causes.length
+          ? causes.map((cause) => `
+            <div class="admin-row">
+              <div>
+                <div class="admin-row-title">${escapeHtml(cause.title)} <span class="badge ${cause.active ? "badge-green" : "badge-orange"}">${cause.active ? "Active" : "Paused"}</span></div>
+                <div class="admin-row-meta">${escapeHtml(cause.category)} | Goal ${compactNumber(cause.goal, { money: true })} | Raised ${compactNumber(cause.raised, { money: true })} | NGO: ${escapeHtml(cause.assignedNgo?.name || "Unassigned")}</div>
+              </div>
+            </div>`).join("")
+          : `<div class="empty-panel"><strong>No causes yet</strong><span>Create a real cause and assign it to an approved NGO to unlock donations.</span></div>`;
       }
       const pendingEl = document.getElementById("admin-pending-ngos");
       if (pendingEl) {
         pendingEl.innerHTML = pending.length
           ? pending.map((ngo) => `
-            <div class="activity-item">
+            <div class="admin-row">
               <div>
-                <strong>${escapeHtml(ngo.name)}</strong>
-                <span>${escapeHtml(ngo.email)} - ${escapeHtml(ngo.areaOfWork || "NGO")}</span>
+                <div class="admin-row-title">${escapeHtml(ngo.name)}</div>
+                <div class="admin-row-meta">${escapeHtml(ngo.email)} - ${escapeHtml(ngo.areaOfWork || "NGO")}</div>
               </div>
               <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
                 <button class="btn btn-primary" onclick="approveNgo('${ngo._id}')">Approve</button>
@@ -771,10 +878,10 @@
       if (allNgosEl) {
         allNgosEl.innerHTML = allNgos.length
           ? allNgos.map((ngo) => `
-            <div class="activity-item">
+            <div class="admin-row">
               <div>
-                <strong>${escapeHtml(ngo.name)}</strong>
-                <span>${ngo.verified ? "Approved" : "Pending"} - ${escapeHtml(ngo.email)}</span>
+                <div class="admin-row-title">${escapeHtml(ngo.name)} <span class="badge ${ngo.verified ? "badge-green" : "badge-orange"}">${ngo.verified ? "Approved" : "Pending"}</span></div>
+                <div class="admin-row-meta">${escapeHtml(ngo.email)} - ${compactNumber(ngo.totalReceived || 0, { money: true })} received</div>
               </div>
               <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
                 ${ngo.verified ? "" : `<button class="btn btn-primary" onclick="approveNgo('${ngo._id}')">Approve</button>`}
@@ -787,8 +894,8 @@
       if (usersEl) {
         usersEl.innerHTML = users.length
           ? users.map((user) => `
-            <div class="activity-item">
-              <div><strong>${escapeHtml(user.name)}</strong><span>${escapeHtml(user.email)} - ${compactNumber(user.xp)} XP</span></div>
+            <div class="admin-row">
+              <div><div class="admin-row-title">${escapeHtml(user.name)} <span class="badge badge-blue">${escapeHtml(user.role || "user")}</span></div><div class="admin-row-meta">${escapeHtml(user.email)} - ${compactNumber(user.xp)} XP - ${compactNumber(user.totalDonated, { money: true })} donated</div></div>
               <button class="btn btn-outline" onclick="resetUserActivity('${user._id}')">Reset</button>
             </div>`).join("")
           : `<div class="empty-panel">No users found.</div>`;
@@ -798,10 +905,10 @@
         const donations = donationData.donations || [];
         donationsEl.innerHTML = donations.length
           ? donations.map((donation) => `
-            <div class="activity-item">
+            <div class="admin-row">
               <div>
-                <strong>${escapeHtml(donation.user?.name || "User")} - ${compactNumber(donation.amount, { money: true })}</strong>
-                <span>${escapeHtml(donation.cause?.title || "Cause")} - ${escapeHtml(donation.status)}</span>
+                <div class="admin-row-title">${escapeHtml(donation.user?.name || "User")} - ${compactNumber(donation.amount, { money: true })} <span class="badge ${donation.status === "verified" ? "badge-green" : "badge-blue"}">${escapeHtml(donation.status)}</span></div>
+                <div class="admin-row-meta">${escapeHtml(donation.cause?.title || "Cause")} - ${escapeHtml(donation.ngo?.name || "NGO")} - ${escapeHtml(donation.paymentProvider || "record")}</div>
               </div>
             </div>`).join("")
           : `<div class="empty-panel">No real donations found.</div>`;
@@ -832,6 +939,50 @@
     notify("User activity reset.");
     await loadAdminPanel();
     await Promise.all([loadDashboard(), loadLeaderboard("donors"), loadStats(), loadCauses()]);
+  };
+
+  window.createAdminCause = async function createAdminCause() {
+    const payload = {
+      title: value("#admin-cause-title"),
+      category: value("#admin-cause-category"),
+      goal: Number(value("#admin-cause-goal")),
+      assignedNgo: value("#admin-cause-ngo"),
+      description: value("#admin-cause-description"),
+      impactPerRupee: value("#admin-cause-impact"),
+      icon: "SM",
+    };
+    try {
+      await BackendService.adminCreateCause(payload);
+      notify("Cause created and connected to approved NGO.");
+      ["#admin-cause-title", "#admin-cause-goal", "#admin-cause-description", "#admin-cause-impact"].forEach((selector) => {
+        const node = document.querySelector(selector);
+        if (node) node.value = "";
+      });
+      await Promise.all([loadAdminPanel(), loadCauses()]);
+    } catch (err) {
+      notify(`Cause creation failed: ${err.message}`);
+    }
+  };
+
+  window.submitNGORegistration = async function submitNGORegistration() {
+    const payload = {
+      name: value("#ngo-name"),
+      regNumber: value("#ngo-reg"),
+      email: value("#ngo-email"),
+      password: value("#ngo-password"),
+      taxStatus: value("#ngo-tax"),
+      areaOfWork: value("#ngo-area"),
+      location: value("#ngo-location"),
+      volunteerCount: Number(value("#ngo-volunteers")) || 0,
+      description: value("#ngo-description"),
+    };
+    try {
+      await BackendService.registerNGO(payload);
+      closeModal("ngo-modal");
+      notify("NGO application submitted for admin approval.");
+    } catch (err) {
+      notify(`NGO registration failed: ${err.message}`);
+    }
   };
 
   document.addEventListener("DOMContentLoaded", async () => {

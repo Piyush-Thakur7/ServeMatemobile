@@ -24,6 +24,18 @@ router.get("/ngos/all", adminOnly, async (req, res) => {
   }
 });
 
+router.get("/causes", adminOnly, async (req, res) => {
+  try {
+    const causes = await Cause.find()
+      .populate("assignedNgo", "name verified")
+      .sort({ createdAt: -1 });
+    return res.json(causes);
+  } catch (err) {
+    console.error("[admin] Cause list failed:", err.message);
+    return res.status(500).json({ error: "Unable to load causes" });
+  }
+});
+
 router.patch("/ngos/:id/verify", adminOnly, async (req, res) => {
   try {
     const ngo = await NGO.findByIdAndUpdate(
@@ -59,18 +71,23 @@ router.delete("/ngos/:id", adminOnly, async (req, res) => {
 router.post("/causes", adminOnly, async (req, res) => {
   try {
     const { title, description, icon, category, goal, impactPerRupee, assignedNgo } = req.body;
-    if (!title || !description || !category || !goal) {
-      return res.status(400).json({ error: "Required fields missing" });
+    if (!title || !description || !category || !goal || !assignedNgo) {
+      return res.status(400).json({ error: "Title, description, category, goal, and approved NGO are required" });
+    }
+
+    const ngo = await NGO.findOne({ _id: assignedNgo, verified: true });
+    if (!ngo) {
+      return res.status(400).json({ error: "Cause must be assigned to an approved NGO" });
     }
 
     const cause = await Cause.create({
       title,
       description,
-      icon,
+      icon: icon || "SM",
       category,
       goal: Number(goal),
-      impactPerRupee,
-      assignedNgo: assignedNgo || null,
+      impactPerRupee: impactPerRupee || "Real impact tracked after verification",
+      assignedNgo,
     });
 
     return res.status(201).json(cause);

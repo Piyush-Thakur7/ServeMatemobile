@@ -106,6 +106,10 @@ const donationSchema = new mongoose.Schema({
   amount:     { type: Number, required: true, min: 10 },
   xpEarned:  { type: Number, default: 0 },
   status:     { type: String, enum: ["pending","assigned","completed","verified"], default: "pending" },
+  paymentProvider: { type: String, default: "" },
+  paymentOrderId: { type: String, default: "" },
+  paymentId:   { type: String, default: "" },
+  paymentSignature: { type: String, default: "" },
   proofVideo: { type: String, default: "" },   // YouTube URL
   proofNote:  { type: String, default: "" },
   location:   { type: String, default: "" },
