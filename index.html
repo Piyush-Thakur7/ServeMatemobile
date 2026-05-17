@@ -1143,6 +1143,11 @@
         </div>
 
         <div class="admin-section">
+          <div class="admin-section-head"><div><h4>Contact Inbox</h4><p class="admin-muted">Messages submitted from the website contact form.</p></div></div>
+          <div class="admin-list" id="admin-contacts"><div class="empty-panel">No contact messages loaded.</div></div>
+        </div>
+
+        <div class="admin-section">
           <div class="admin-section-head"><div><h4>User Activity Reset</h4><p class="admin-muted">Use only for account cleanup. This removes that user's donations, XP, badges, and totals.</p></div></div>
           <div class="admin-list" id="admin-users"><div class="empty-panel">No user data loaded.</div></div>
         </div>
@@ -1242,8 +1247,8 @@
         </div>
         <div class="card">
           <h3 style="font-weight:700;margin-bottom:1.5rem;">Send a Message</h3>
-          <div class="form-group"><label>Your Name</label><input type="text" placeholder="Enter your full name"></div>
-          <div class="form-group"><label>Email Address</label><input type="email" placeholder="your@email.com"></div>
+          <div class="form-group"><label>Your Name</label><input id="contact-name" type="text" placeholder="Enter your full name"></div>
+          <div class="form-group"><label>Email Address</label><input id="contact-email" type="email" placeholder="your@email.com"></div>
           <div class="form-group"><label>Subject</label>
             <select>
               <option>General Inquiry</option>
@@ -1253,8 +1258,8 @@
               <option>Media / Press</option>
             </select>
           </div>
-          <div class="form-group"><label>Message</label><textarea rows="5" placeholder="Tell us how we can help..."></textarea></div>
-          <button class="btn btn-primary btn-full" onclick="showToast('Message sent! We\'ll reply within 24 hours. 📩')">Send Message</button>
+          <div class="form-group"><label>Message</label><textarea id="contact-message" rows="5" placeholder="Tell us how we can help..."></textarea></div>
+          <button class="btn btn-primary btn-full" onclick="submitContactMessage()">Send Message</button>
         </div>
       </div>
     </div>
@@ -1837,13 +1842,15 @@ window.addEventListener('resize', () => {
       .admin-row-meta { color:var(--text2); font-size:.82rem; line-height:1.5; }
       .admin-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.75rem; }
       .admin-form .full { grid-column:1/-1; }
+      .proof-admin-form { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.5rem; margin-top:.7rem; }
+      .proof-admin-form input { padding:.65rem .75rem; border:1px solid var(--border); border-radius:10px; background:var(--bg); color:var(--text); }
       .title-card { padding:1rem; border-radius:20px; color:#fff; position:relative; overflow:hidden; box-shadow:0 22px 70px rgba(79,70,229,.24); }
       .title-card::before { content:""; position:absolute; inset:-2px; background:linear-gradient(120deg, rgba(255,255,255,.42), transparent 34%, rgba(255,255,255,.24)); animation: sm-sheen 3s linear infinite; }
       .title-card > * { position:relative; }
       .sm-skeleton { opacity:.75; }
       @keyframes sm-sheen { from { transform: translateX(-80%); } to { transform: translateX(80%); } }
       @media (max-width: 900px) { .admin-shell { grid-template-columns:1fr; } .admin-sidebar { position:static; } }
-      @media (max-width: 720px) { .premium-cause-card { min-height: auto; } .cause-visual { height: 112px; } .lb-row { align-items:flex-start; } .admin-row { grid-template-columns:1fr; } .admin-form { grid-template-columns:1fr; } }
+      @media (max-width: 720px) { .premium-cause-card { min-height: auto; } .cause-visual { height: 112px; } .lb-row { align-items:flex-start; } .admin-row { grid-template-columns:1fr; } .admin-form, .proof-admin-form { grid-template-columns:1fr; } }
     `;
     document.head.appendChild(style);
   }
@@ -2304,6 +2311,7 @@ window.addEventListener('resize', () => {
     registerNGO: (payload) => request("/auth/ngo/register", { method: "POST", body: payload }),
     updateProfile: (payload) => request("/profile", { method: "PATCH", body: payload }),
     volunteer: (ngoId, payload = {}) => request(`/ngos/${ngoId}/volunteers`, { method: "POST", body: payload }),
+    contact: (payload) => request("/contact", { method: "POST", body: payload }),
     transparency: () => request("/transparency"),
     ngos: () => request("/ngos"),
     adminOverview: () => request("/admin/overview"),
@@ -2315,6 +2323,10 @@ window.addEventListener('resize', () => {
     adminRemoveNgo: (id) => request(`/admin/ngos/${id}`, { method: "DELETE" }),
     adminUsers: () => request("/admin/users"),
     adminDonations: () => request("/admin/donations"),
+    adminContacts: () => request("/admin/contacts"),
+    adminMarkContactRead: (id) => request(`/admin/contacts/${id}/read`, { method: "PATCH", body: {} }),
+    adminCompleteDonation: (id, payload) => request(`/admin/donations/${id}/complete`, { method: "PATCH", body: payload }),
+    adminVerifyDonation: (id) => request(`/admin/donations/${id}/verify`, { method: "PATCH", body: {} }),
     adminResetUser: (id) => request(`/admin/users/${id}/reset-activity`, { method: "POST", body: {} }),
     adminResetAll: () => request("/admin/reset/all-activity", { method: "POST", body: { confirmation: "RESET_ALL_ACTIVITY" } }),
   };
@@ -2375,6 +2387,10 @@ window.addEventListener('resize', () => {
       if (button) {
         button.disabled = true;
         button.textContent = "Processing payment...";
+      }
+      const paymentConfig = await BackendService.paymentConfig();
+      if (!paymentConfig.enabled) {
+        throw new Error("Razorpay is not configured on the server");
       }
       const order = await BackendService.createPaymentOrder(amount, cause);
       await loadRazorpayScript();
@@ -2454,13 +2470,14 @@ window.addEventListener('resize', () => {
       return;
     }
     try {
-      const [overview, pending, allNgos, users, donationData, causes] = await Promise.all([
+      const [overview, pending, allNgos, users, donationData, causes, contacts] = await Promise.all([
         BackendService.adminOverview(),
         BackendService.adminPendingNgos(),
         BackendService.adminAllNgos(),
         BackendService.adminUsers(),
         BackendService.adminDonations(),
         BackendService.adminCauses(),
+        BackendService.adminContacts(),
       ]);
       state.admin.causes = causes || [];
       const causeNgoSelect = document.getElementById("admin-cause-ngo");
@@ -2479,6 +2496,7 @@ window.addEventListener('resize', () => {
           ["Verified Donations", overview.totalDonations],
           ["Real Donations", donationData.total || 0],
           ["Live Causes", causes.length || 0],
+          ["Unread Messages", overview.unreadMessages || 0],
         ].map(([label, value]) => `<div class="admin-stat-card"><div class="label">${label}</div><div class="value">${compactNumber(value)}</div></div>`).join("");
       }
       const causesEl = document.getElementById("admin-causes");
@@ -2544,9 +2562,33 @@ window.addEventListener('resize', () => {
               <div>
                 <div class="admin-row-title">${escapeHtml(donation.user?.name || "User")} - ${compactNumber(donation.amount, { money: true })} <span class="badge ${donation.status === "verified" ? "badge-green" : "badge-blue"}">${escapeHtml(donation.status)}</span></div>
                 <div class="admin-row-meta">${escapeHtml(donation.cause?.title || "Cause")} - ${escapeHtml(donation.ngo?.name || "NGO")} - ${escapeHtml(donation.paymentProvider || "record")}</div>
+                ${donation.status === "verified" ? `<div class="admin-row-meta">Public proof verified.</div>` : `
+                  <div class="proof-admin-form">
+                    <input id="proof-url-${donation._id}" placeholder="Proof video URL" value="${escapeHtml(donation.proofVideo || "")}">
+                    <input id="proof-note-${donation._id}" placeholder="Proof note" value="${escapeHtml(donation.proofNote || "")}">
+                    <input id="proof-location-${donation._id}" placeholder="Location" value="${escapeHtml(donation.location || "")}">
+                  </div>`}
+              </div>
+              <div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:flex-end;">
+                ${donation.status === "verified" ? "" : `<button class="btn btn-outline" onclick="completeDonationProof('${donation._id}')">Save Proof</button><button class="btn btn-primary" onclick="verifyDonationProof('${donation._id}')">Verify</button>`}
               </div>
             </div>`).join("")
           : `<div class="empty-panel">No real donations found.</div>`;
+      }
+      const contactsEl = document.getElementById("admin-contacts");
+      if (contactsEl) {
+        contactsEl.innerHTML = contacts.length
+          ? contacts.map((contact) => `
+            <div class="admin-row">
+              <div>
+                <div class="admin-row-title">${escapeHtml(contact.name)} <span class="badge ${contact.read ? "badge-blue" : "badge-orange"}">${contact.read ? "Read" : "Unread"}</span></div>
+                <div class="admin-row-meta">${escapeHtml(contact.email)} - ${escapeHtml(contact.message)}</div>
+              </div>
+              <div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:flex-end;">
+                ${contact.read ? "" : `<button class="btn btn-outline" onclick="markContactRead('${contact._id}')">Mark Read</button>`}
+              </div>
+            </div>`).join("")
+          : `<div class="empty-panel">No contact messages found.</div>`;
       }
     } catch (err) {
       notify(`Admin panel unavailable: ${err.message}`);
@@ -2599,6 +2641,47 @@ window.addEventListener('resize', () => {
     }
   };
 
+  window.completeDonationProof = async function completeDonationProof(id) {
+    const payload = {
+      proofVideo: value(`#proof-url-${id}`),
+      proofNote: value(`#proof-note-${id}`),
+      location: value(`#proof-location-${id}`),
+    };
+    try {
+      await BackendService.adminCompleteDonation(id, payload);
+      notify("Proof saved for donation.");
+      await loadAdminPanel();
+    } catch (err) {
+      notify(`Proof save failed: ${err.message}`);
+    }
+  };
+
+  window.verifyDonationProof = async function verifyDonationProof(id) {
+    const payload = {
+      proofVideo: value(`#proof-url-${id}`),
+      proofNote: value(`#proof-note-${id}`),
+      location: value(`#proof-location-${id}`),
+    };
+    try {
+      await BackendService.adminCompleteDonation(id, payload);
+      await BackendService.adminVerifyDonation(id);
+      notify("Donation proof verified and published.");
+      await Promise.all([loadAdminPanel(), loadTransparency(), loadStats(), loadLeaderboard("ngos")]);
+    } catch (err) {
+      notify(`Verification failed: ${err.message}`);
+    }
+  };
+
+  window.markContactRead = async function markContactRead(id) {
+    try {
+      await BackendService.adminMarkContactRead(id);
+      notify("Message marked as read.");
+      await loadAdminPanel();
+    } catch (err) {
+      notify(`Contact update failed: ${err.message}`);
+    }
+  };
+
   window.submitNGORegistration = async function submitNGORegistration() {
     const payload = {
       name: value("#ngo-name"),
@@ -2617,6 +2700,24 @@ window.addEventListener('resize', () => {
       notify("NGO application submitted for admin approval.");
     } catch (err) {
       notify(`NGO registration failed: ${err.message}`);
+    }
+  };
+
+  window.submitContactMessage = async function submitContactMessage() {
+    const payload = {
+      name: value("#contact-name"),
+      email: value("#contact-email"),
+      message: value("#contact-message"),
+    };
+    try {
+      await BackendService.contact(payload);
+      ["#contact-name", "#contact-email", "#contact-message"].forEach((selector) => {
+        const node = document.querySelector(selector);
+        if (node) node.value = "";
+      });
+      notify("Message sent. It is saved for the admin team.");
+    } catch (err) {
+      notify(`Message failed: ${err.message}`);
     }
   };
 

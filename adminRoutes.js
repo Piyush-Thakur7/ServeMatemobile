@@ -149,23 +149,28 @@ router.get("/donations", adminOnly, async (req, res) => {
 router.patch("/donations/:id/complete", adminOnly, async (req, res) => {
   try {
     const { proofVideo, proofNote, location } = req.body;
-    const donation = await Donation.findByIdAndUpdate(
-      req.params.id,
-      { status: "completed", proofVideo, proofNote, location },
-      { new: true }
-    ).populate("cause ngo");
-
+    if (!proofVideo) {
+      return res.status(400).json({ error: "A real proof video URL is required" });
+    }
+    const donation = await Donation.findById(req.params.id).populate("cause ngo");
     if (!donation) {
       return res.status(404).json({ error: "Donation not found" });
     }
 
-    if (donation.ngo) {
+    const shouldCountTask = !["completed", "verified"].includes(donation.status);
+    donation.status = "completed";
+    donation.proofVideo = proofVideo;
+    donation.proofNote = proofNote || "";
+    donation.location = location || donation.location || "";
+    await donation.save();
+
+    if (donation.ngo && shouldCountTask) {
       await NGO.findByIdAndUpdate(donation.ngo._id, {
         $inc: { tasksCompleted: 1, impactScore: Math.floor(donation.amount / 10) },
       });
     }
 
-    return res.json({ message: "Donation marked complete and transparency log created", donation });
+    return res.json({ message: "Donation proof saved", donation });
   } catch (err) {
     console.error("[admin] Donation completion failed:", err.message);
     return res.status(500).json({ error: "Unable to complete donation" });
